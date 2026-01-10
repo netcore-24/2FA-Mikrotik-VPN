@@ -43,7 +43,7 @@ export AUTO_START="true"
 export CREATE_ADMIN="true"
 export ADMIN_USERNAME="admin"
 export ADMIN_EMAIL="admin@example.com"
-export ADMIN_PASSWORD="your_password"  # если не указан — будет сгенерирован
+export ADMIN_PASSWORD="your_password"  # если не указан — будет создан автоматически
 export NON_INTERACTIVE="true"
 ```
 
