@@ -1,28 +1,27 @@
 # Быстрый старт - Развертывание на сервере
 
-## ✅ Проект успешно развернут!
+## 🚀 Установка на новую систему (1 команда)
 
-### Что уже готово:
+```bash
+wget -O install.sh "https://raw.githubusercontent.com/sh034/2FA-Mikrotik-VPN/main/install.sh"
+sudo bash install.sh
+```
 
-1. ✅ Все зависимости установлены
-2. ✅ База данных инициализирована
-3. ✅ Frontend собран
-4. ✅ Администратор создан
-5. ✅ Конфигурация настроена
+Скрипт сам установит зависимости, склонирует проект в `/opt/mikrotik-2fa-vpn`, настроит systemd и запустит приложение.
 
 ## 🚀 Запуск приложения
 
 ### Вариант 1: Запуск через скрипт (рекомендуется)
 
 ```bash
-cd /root/mikrotik-2fa-vpn
+cd /opt/mikrotik-2fa-vpn
 ./scripts/start.sh
 ```
 
 ### Вариант 2: Запуск напрямую
 
 ```bash
-cd /root/mikrotik-2fa-vpn
+cd /opt/mikrotik-2fa-vpn
 source venv/bin/activate
 uvicorn backend.main:app --host 0.0.0.0 --port 8000
 ```
@@ -31,7 +30,7 @@ uvicorn backend.main:app --host 0.0.0.0 --port 8000
 
 ```bash
 # Копируем service файл
-sudo cp /root/mikrotik-2fa-vpn/mikrotik-2fa-vpn.service /etc/systemd/system/
+sudo cp /opt/mikrotik-2fa-vpn/mikrotik-2fa-vpn.service /etc/systemd/system/
 
 # Редактируем пути в файле (если нужно)
 sudo nano /etc/systemd/system/mikrotik-2fa-vpn.service
@@ -64,7 +63,7 @@ sudo systemctl status mikrotik-2fa-vpn
 ## 🤖 Запуск Telegram бота
 
 ```bash
-cd /root/mikrotik-2fa-vpn
+cd /opt/mikrotik-2fa-vpn
 ./scripts/start_bot.sh
 ```
 

@@ -4,21 +4,25 @@ After=network.target mikrotik-2fa-vpn.service
 
 [Service]
 Type=simple
-User=root
-WorkingDirectory=/root/mikrotik-2fa-vpn
-Environment="PATH=/root/mikrotik-2fa-vpn/venv/bin"
-ExecStart=/root/mikrotik-2fa-vpn/venv/bin/python3 -m telegram_bot.bot
+User=mikrotik-2fa
+WorkingDirectory=/opt/mikrotik-2fa-vpn
+Environment="PATH=/opt/mikrotik-2fa-vpn/venv/bin"
+EnvironmentFile=/opt/mikrotik-2fa-vpn/.env
+ExecStart=/opt/mikrotik-2fa-vpn/venv/bin/python3 -m telegram_bot.bot
 Restart=always
 RestartSec=10
 
 # Логирование
-StandardOutput=append:/root/mikrotik-2fa-vpn/logs/telegram_bot.log
-StandardError=append:/root/mikrotik-2fa-vpn/logs/telegram_bot.log
+StandardOutput=journal
+StandardError=journal
 SyslogIdentifier=mikrotik-2fa-vpn-telegram-bot
 
 # Безопасность
 NoNewPrivileges=true
 PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/mikrotik-2fa-vpn/data /opt/mikrotik-2fa-vpn/logs
 
 [Install]
 WantedBy=multi-user.target

@@ -4,6 +4,17 @@
 
 Скрипт `scripts/install.sh` полностью автоматизирует установку, сборку, запуск и настройку автозагрузки.
 
+### Вариант 0: Установка “с нуля” одной командой (wget → sudo bash)
+
+Этот вариант подходит для новой системы, где проекта ещё нет на диске.
+
+```bash
+wget -O install.sh "https://raw.githubusercontent.com/sh034/2FA-Mikrotik-VPN/main/install.sh"
+sudo bash install.sh
+```
+
+По умолчанию проект будет установлен в `/opt/mikrotik-2fa-vpn`, создан сервис `mikrotik-2fa-vpn.service` и приложение будет запущено.
+
 ### Вариант 1: Установка из Git репозитория
 
 ```bash

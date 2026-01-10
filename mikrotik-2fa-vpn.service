@@ -1,13 +1,15 @@
 [Unit]
 Description=MikroTik 2FA VPN System
 After=network.target
+Wants=network-online.target
 
 [Service]
 Type=simple
-User=root
-WorkingDirectory=/root/mikrotik-2fa-vpn
-Environment="PATH=/root/mikrotik-2fa-vpn/venv/bin"
-ExecStart=/root/mikrotik-2fa-vpn/venv/bin/uvicorn backend.main:app --host 0.0.0.0 --port 8000
+User=mikrotik-2fa
+WorkingDirectory=/opt/mikrotik-2fa-vpn
+Environment="PATH=/opt/mikrotik-2fa-vpn/venv/bin"
+EnvironmentFile=/opt/mikrotik-2fa-vpn/.env
+ExecStart=/opt/mikrotik-2fa-vpn/venv/bin/uvicorn backend.main:app --host 0.0.0.0 --port 8000
 Restart=always
 RestartSec=10
 
@@ -19,6 +21,9 @@ SyslogIdentifier=mikrotik-2fa-vpn
 # Безопасность
 NoNewPrivileges=true
 PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/mikrotik-2fa-vpn/data /opt/mikrotik-2fa-vpn/logs
 
 [Install]
 WantedBy=multi-user.target
