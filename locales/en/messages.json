@@ -1,0 +1,261 @@
+{
+  "app": {
+    "name": "MikroTik 2FA VPN System",
+    "version": "1.0.0"
+  },
+  "auth": {
+    "login": {
+      "title": "Login",
+      "success": "Successfully logged in",
+      "invalid_credentials": "Invalid username or password",
+      "inactive_account": "Account is inactive",
+      "username": "Username",
+      "password": "Password",
+      "button": "Login"
+    },
+    "logout": {
+      "title": "Logout",
+      "success": "Successfully logged out"
+    },
+    "token": {
+      "invalid": "Invalid access token",
+      "expired": "Token expired",
+      "refresh_success": "Token successfully refreshed",
+      "refresh_invalid": "Invalid refresh token"
+    },
+    "unauthorized": "Authentication required",
+    "forbidden": "Insufficient permissions",
+    "super_admin_required": "Super administrator rights required"
+  },
+  "admin": {
+    "not_found": "Admin not found",
+    "created": "Admin successfully created",
+    "updated": "Admin successfully updated",
+    "deleted": "Admin successfully deleted",
+    "username_exists": "Username already exists",
+    "email_exists": "Email already in use"
+  },
+  "user": {
+    "not_found": "User not found",
+    "created": "User successfully created",
+    "updated": "User successfully updated",
+    "deleted": "User successfully deleted",
+    "telegram_id_exists": "User with this Telegram ID already exists",
+    "status_changed": "User status changed"
+  },
+  "registration": {
+    "request": {
+      "created": "Registration request created",
+      "approved": "Registration request approved",
+      "rejected": "Registration request rejected",
+      "not_found": "Registration request not found",
+      "already_processed": "Request already processed"
+    }
+  },
+  "vpn": {
+    "session": {
+      "created": "VPN session created",
+      "connected": "VPN session connected",
+      "confirmed": "VPN session confirmed",
+      "disconnected": "VPN session disconnected",
+      "not_found": "VPN session not found",
+      "already_active": "User already has an active session"
+    },
+    "connection": {
+      "requested": "VPN connection request sent",
+      "credentials_sent": "VPN credentials sent",
+      "waiting_confirmation": "Waiting for connection confirmation"
+    }
+  },
+  "mikrotik": {
+    "connection": {
+      "success": "MikroTik connection successful",
+      "failed": "Failed to connect to MikroTik",
+      "timeout": "MikroTik connection timeout",
+      "auth_failed": "MikroTik authentication failed"
+    },
+    "user": {
+      "created": "User created in MikroTik",
+      "updated": "User updated in MikroTik",
+      "deleted": "User deleted from MikroTik",
+      "not_found": "User not found in MikroTik"
+    },
+    "firewall": {
+      "rule_enabled": "Firewall rule enabled",
+      "rule_disabled": "Firewall rule disabled",
+      "rule_not_found": "Firewall rule not found"
+    },
+    "config": {
+      "not_found": "MikroTik configuration not found",
+      "created": "MikroTik configuration created",
+      "updated": "MikroTik configuration updated",
+      "deleted": "MikroTik configuration successfully deleted",
+      "test_success": "MikroTik connection test successful",
+      "test_failed": "MikroTik connection test failed"
+    }
+  },
+  "settings": {
+    "not_found": "Setting not found",
+    "updated": "Setting updated",
+    "created": "Setting created",
+    "deleted": "Setting deleted"
+  },
+  "validation": {
+    "required": "Field is required",
+    "invalid_email": "Invalid email format",
+    "invalid_phone": "Invalid phone format",
+    "min_length": "Minimum length: {min_length} characters",
+    "max_length": "Maximum length: {max_length} characters",
+    "invalid_format": "Invalid data format"
+  },
+  "error": {
+    "internal": "Internal server error",
+    "not_found": "Resource not found",
+    "bad_request": "Bad request",
+    "unauthorized": "Unauthorized",
+    "forbidden": "Forbidden",
+    "conflict": "Data conflict",
+    "database": "Database error",
+    "network": "Network error",
+    "timeout": "Operation timeout"
+  },
+  "success": {
+    "operation": "Operation completed successfully",
+    "saved": "Data saved",
+    "deleted": "Data deleted"
+  },
+  "common": {
+    "yes": "Yes",
+    "no": "No",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "create": "Create",
+    "update": "Update",
+    "search": "Search",
+    "filter": "Filter",
+    "actions": "Actions",
+    "status": "Status",
+    "created_at": "Created",
+    "updated_at": "Updated",
+    "loading": "Loading...",
+    "no_data": "No data"
+  },
+  "bot": {
+    "start": {
+      "welcome_new": "Welcome to MikroTik 2FA VPN System!\\n\\nTo get started, you need to register.",
+      "welcome_registered": "Welcome back!",
+      "user_info": "Your information:",
+      "instructions": "Use /register to register in the system."
+    },
+    "register": {
+      "welcome": "Registration in the system\\n\\nTo register, please provide your full name.",
+      "ask_full_name": "Please enter your full name:",
+      "invalid_name": "Name must be at least 2 characters. Please try again:",
+      "success": "Registration request created successfully!\\nRequest ID: {request_id}",
+      "waiting_approval": "Your request has been sent to the administrator for review. You will be notified after review.",
+      "already_registered": "You are already registered in the system."
+    },
+    "vpn": {
+      "request": {
+        "welcome": "VPN Connection Request\\n\\nTo create a VPN session, please provide a reason for the connection.",
+        "ask_reason": "Please specify the reason for VPN connection (at least 5 characters):",
+        "invalid_reason": "Reason must be at least 5 characters. Please try again:",
+        "user_not_approved": "Your account has not been approved by the administrator yet. Please wait for your request to be reviewed.",
+        "has_active_sessions": "You already have active VPN sessions ({count}).",
+        "active_session_info": "Session {session_id}\\nStatus: {status}\\nCreated: {created_at}",
+        "success": "VPN session created successfully!\\nSession ID: {session_id}\\nDuration: {duration} hours",
+        "session_info": "Status: {status}\\nCreated: {created_at}"
+      },
+      "sessions": {
+        "title": "Your active VPN sessions ({count}):",
+        "session_item": "• {session_id} - {status} (created: {created_at})",
+        "session_details": "Session: {session_id}\\nStatus: {status}",
+        "no_active": "You have no active VPN sessions.\\nUse /request_vpn to create a new session."
+      },
+      "session": {
+        "confirmation_pending": "Session confirmation is being processed...",
+        "disconnected": "VPN session disconnected successfully."
+      }
+    },
+    "status": {
+      "title": "Your account status:",
+      "active_sessions": "Active sessions",
+      "no_active_sessions": "No active sessions"
+    },
+    "notifications": {
+      "session_confirmed": "✅ Your VPN session has been confirmed!\\n\\nSession ID: {session_id}\\nExpires: {expires_at}",
+      "session_disconnected": "🔌 Your VPN session has been disconnected.\\n\\nSession ID: {session_id}",
+      "session_expired": "⏰ Your VPN session has expired.\\n\\nSession ID: {session_id}\\n\\nUse /request_vpn to create a new session.",
+      "session_reminder": "⏳ Reminder: your VPN session will expire soon!\\n\\nSession ID: {session_id}\\nHours remaining: {hours}\\nExpires: {expires_at}\\n\\nUse /my_sessions to manage your sessions."
+    },
+    "help": {
+      "title": "Available commands:",
+      "commands": "/start - Start working\\n/help - Show this help\\n/register - Register in the system\\n/status - Show account status",
+      "commands_registered": "Additional commands for registered users:\\n/request_vpn - Request VPN connection\\n/my_sessions - Show my active sessions\\n/cancel - Cancel current operation",
+      "commands_unregistered": "To access additional features, you need to register (/register)."
+    },
+    "buttons": {
+      "register": "Register",
+      "request_vpn": "Request VPN",
+      "my_sessions": "My Sessions",
+      "status": "Status",
+      "disconnect": "Disconnect"
+    },
+    "common": {
+      "full_name": "Full Name",
+      "status": "Status",
+      "username": "Username"
+    },
+    "cancel": {
+      "message": "Operation cancelled."
+    },
+    "errors": {
+      "not_registered": "You are not registered in the system. Use /register to register.",
+      "user_not_found": "User not found in the system.",
+      "unknown_command": "Unknown command. Use /help to view available commands.",
+      "unknown_action": "Unknown action.",
+      "internal_error": "An internal error occurred. Please try again later."
+    }
+  },
+  "telegram": {
+    "bot": {
+      "start": "Welcome! Use /register to register.",
+      "register": {
+        "request": "Please fill out the registration form",
+        "success": "Your registration request has been sent to the administrator for review",
+        "pending": "Your request is under review",
+        "approved": "Your request has been approved! Welcome to the system.",
+        "rejected": "Your request has been rejected: {reason}"
+      },
+      "vpn": {
+        "connect_request": "VPN connection request sent",
+        "connect_confirm": "Did you connect? [Username: {username}]",
+        "connect_yes": "Yes",
+        "connect_no": "No",
+        "connected": "VPN connection activated",
+        "rejected": "Connection rejected",
+        "disconnect": "VPN connection terminated",
+        "reminder": "Do you want to continue working in VPN? [Username: {username}]",
+        "continue_yes": "Yes, continue",
+        "continue_no": "No, disconnect",
+        "session_extended": "Session extended",
+        "session_ended": "Session ended"
+      },
+      "help": "Use /start to begin, /register to register, /connect to connect to VPN"
+    }
+  },
+  "setup_wizard": {
+    "welcome": "Welcome to the setup wizard",
+    "step": {
+      "1": "Basic Information",
+      "2": "Security",
+      "3": "Telegram Bot",
+      "4": "MikroTik Router",
+      "5": "Notifications",
+      "6": "Completion"
+    },
+    "completed": "Setup completed successfully"
+  }
+}

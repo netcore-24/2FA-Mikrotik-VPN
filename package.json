@@ -1,0 +1,21 @@
+{
+  "name": "mikrotik-2fa-vpn-frontend",
+  "version": "1.0.0",
+  "description": "Frontend для системы двухфакторной аутентификации VPN MikroTik",
+  "private": true,
+  "scripts": {
+    "dev": "echo 'Frontend dev server - будет настроен при разработке'",
+    "build": "echo 'Frontend build - будет настроен при разработке'",
+    "start": "echo 'Frontend start - будет настроен при разработке'"
+  },
+  "dependencies": {
+    "comment": "Зависимости будут добавлены при разработке frontend"
+  },
+  "devDependencies": {
+    "comment": "Dev зависимости будут добавлены при разработке frontend"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  }
+}

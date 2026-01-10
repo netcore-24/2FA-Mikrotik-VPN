@@ -1,0 +1,36 @@
+# FastAPI и сервер
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+python-multipart==0.0.6
+
+# База данных
+sqlalchemy==2.0.23
+alembic==1.12.1
+
+# Telegram Bot
+python-telegram-bot==20.7
+
+# MikroTik (SSH и REST API)
+paramiko==3.3.1
+requests==2.31.0
+
+# Аутентификация
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-dotenv==1.0.0
+bcrypt==4.1.2
+
+# Утилиты
+pydantic==2.5.0
+pydantic-settings==2.1.0
+apscheduler==3.10.4
+structlog==23.2.0
+python-dateutil==2.8.2
+
+# HTTP клиент
+httpx==0.25.2
+
+# Безопасность и шифрование
+cryptography==41.0.7
+
+# CORS (встроен в FastAPI, дополнительная установка не требуется)

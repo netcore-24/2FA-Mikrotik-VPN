@@ -1,0 +1,64 @@
+"""
+Конфигурация и работа с базой данных SQLite.
+"""
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.pool import StaticPool
+from typing import Generator
+import os
+from config.settings import settings
+
+
+# Создание движка базы данных
+# Для SQLite используем StaticPool для совместимости с asyncio (если потребуется)
+if settings.DATABASE_URL.startswith("sqlite"):
+    # Создаем директорию для базы данных, если её нет
+    db_path = settings.DATABASE_URL.replace("sqlite:///", "")
+    db_dir = os.path.dirname(db_path)
+    if db_dir and not os.path.exists(db_dir):
+        os.makedirs(db_dir, exist_ok=True)
+    
+    engine = create_engine(
+        settings.DATABASE_URL,
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+        echo=settings.DEBUG,
+    )
+else:
+    engine = create_engine(
+        settings.DATABASE_URL,
+        echo=settings.DEBUG,
+    )
+
+# Создание фабрики сессий
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+
+def get_db() -> Generator[Session, None, None]:
+    """
+    Генератор для получения сессии базы данных.
+    Используется как dependency в FastAPI.
+    """
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+def init_db() -> None:
+    """
+    Инициализация базы данных: создание всех таблиц.
+    """
+    from backend.database.base import Base
+    
+    # Создаем директорию для базы данных, если её нет
+    if settings.DATABASE_URL.startswith("sqlite"):
+        db_path = settings.DATABASE_URL.replace("sqlite:///", "")
+        db_dir = os.path.dirname(db_path)
+        if db_dir and not os.path.exists(db_dir):
+            os.makedirs(db_dir, exist_ok=True)
+    
+    # Создаем все таблицы
+    Base.metadata.create_all(bind=engine)
+    print(f"База данных инициализирована: {settings.DATABASE_URL}")
