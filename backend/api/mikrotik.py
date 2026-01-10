@@ -18,6 +18,8 @@ from backend.api.schemas import (
     MikroTikUserCreate,
     MikroTikFirewallRuleListResponse,
     MikroTikFirewallRuleResponse,
+    MikroTikFirewallRuleBinding,
+    MikroTikFirewallRuleAssignRequest,
 )
 from backend.services.mikrotik_config_service import (
     get_mikrotik_config_by_id,
@@ -30,13 +32,18 @@ from backend.services.mikrotik_config_service import (
 from backend.services.mikrotik_service import (
     MikroTikConnectionError,
     get_mikrotik_users,
+    get_mikrotik_users_with_info,
     create_mikrotik_user,
     delete_mikrotik_user,
     get_firewall_rules,
     enable_firewall_rule,
     disable_firewall_rule,
     find_firewall_rule_by_comment,
+    get_user_manager_users,
 )
+from backend.services.user_service import update_user_settings, get_user_settings
+from backend.models.user_setting import UserSetting
+from backend.models.user import User
 from backend.models.mikrotik_config import ConnectionType
 from backend.models.admin import Admin
 
@@ -287,18 +294,20 @@ async def list_mikrotik_users(
     Получить список пользователей из MikroTik User Manager.
     """
     try:
-        users = get_mikrotik_users(db)
+        users, source, warning = get_mikrotik_users_with_info(db)
         
         user_responses = []
         for user in users:
+            name = user.get("name") or user.get("username") or user.get("user") or ""
             user_responses.append(MikroTikUserResponse(
-                name=user.get("name", ""),
+                name=name,
                 profile=user.get("profile"),
                 disabled=user.get("disabled"),
+                number=user.get("number"),
                 data=user,
             ))
         
-        return MikroTikUserListResponse(users=user_responses)
+        return MikroTikUserListResponse(users=user_responses, source=source, warning=warning)
     except MikroTikConnectionError as e:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -380,6 +389,7 @@ async def list_firewall_rules(
         for rule in rules:
             rule_responses.append(MikroTikFirewallRuleResponse(
                 id=rule.get(".id") or rule.get("id"),
+                number=rule.get("number"),
                 chain=rule.get("chain"),
                 action=rule.get("action"),
                 comment=rule.get("comment"),
@@ -393,6 +403,103 @@ async def list_firewall_rules(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=str(e) or t("mikrotik.connection.failed"),
         )
+
+
+@router.get("/firewall-rules/bindings", response_model=list[MikroTikFirewallRuleBinding])
+async def list_firewall_rule_bindings(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_admin: Admin = Depends(get_current_admin),
+):
+    """
+    Получить привязки firewall-правил (по comment) к пользователям.
+    Используется UI для отображения "какое правило за кем закреплено".
+    """
+    rows = (
+        db.query(UserSetting, User)
+        .join(User, User.id == UserSetting.user_id)
+        .filter(UserSetting.firewall_rule_comment.isnot(None))
+        .all()
+    )
+    result: list[MikroTikFirewallRuleBinding] = []
+    for us, u in rows:
+        comment = (us.firewall_rule_comment or "").strip()
+        if not comment:
+            continue
+        result.append(
+            MikroTikFirewallRuleBinding(
+                user_id=u.id,
+                telegram_id=u.telegram_id,
+                full_name=u.full_name,
+                firewall_rule_comment=comment,
+            )
+        )
+    return result
+
+
+@router.post("/firewall-rules/{rule_id}/assign", response_model=dict)
+async def assign_firewall_rule_to_user(
+    rule_id: str,
+    body: MikroTikFirewallRuleAssignRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_admin: Admin = Depends(get_current_admin),
+    t=Depends(get_translate),
+):
+    """
+    Привязать firewall-правило (по MikroTik .id) к пользователю системы.
+
+    Храним привязку в `user_settings.firewall_rule_comment`:
+    - это позволяет включать правило при подтверждении VPN-подключения
+    - и не требует миграции схемы БД
+    """
+    try:
+        # Находим правило по .id (если есть) или по номеру (numbers=NN для SSH),
+        # среди правил, отфильтрованных по RouterOS.
+        rules = get_firewall_rules(db)
+        found = None
+        for r in rules:
+            rid = r.get(".id") or r.get("id")
+            if rid == rule_id:
+                found = r
+                break
+            # fallback: match by number
+            if r.get("number") is not None and str(r.get("number")) == str(rule_id):
+                found = r
+                break
+        if not found:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=t("mikrotik.firewall.rule_not_found"))
+
+        comment = (found.get("comment") or "").strip()
+        if not comment:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Нельзя привязать правило без comment (добавьте comment с '2FA ...' на MikroTik).",
+            )
+
+        # Если user_id не задан — снимаем привязку со всех пользователей у которых этот comment
+        if not body.user_id:
+            updated = (
+                db.query(UserSetting)
+                .filter(UserSetting.firewall_rule_comment == comment)
+                .update({UserSetting.firewall_rule_comment: None})
+            )
+            db.commit()
+            return {"message": "Привязка снята", "updated": int(updated)}
+
+        # 1) Снимаем этот comment с других пользователей (одно правило — один пользователь)
+        db.query(UserSetting).filter(
+            UserSetting.user_id != body.user_id,
+            UserSetting.firewall_rule_comment == comment,
+        ).update({UserSetting.firewall_rule_comment: None})
+        db.commit()
+
+        # 2) Обновляем настройки целевого пользователя (создадутся если нет)
+        update_user_settings(db, body.user_id, firewall_rule_comment=comment)
+
+        return {"message": "Правило привязано", "user_id": body.user_id, "comment": comment, "rule_id": rule_id}
+    except MikroTikConnectionError as e:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(e) or t("mikrotik.connection.failed"))
 
 
 @router.post("/firewall-rules/{rule_id}/enable")
@@ -464,6 +571,28 @@ async def find_firewall_rule_by_comment_endpoint(
             disabled=rule.get("disabled"),
             data=rule,
         )
+    except MikroTikConnectionError as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(e) or t("mikrotik.connection.failed"),
+        )
+
+
+# ========== User Manager ==========
+
+@router.get("/user-manager/users")
+async def get_user_manager_users_endpoint(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_admin: Admin = Depends(get_current_admin),
+    t=Depends(get_translate),
+):
+    """
+    Получить список пользователей из MikroTik User Manager.
+    """
+    try:
+        result = get_user_manager_users(db)
+        return result
     except MikroTikConnectionError as e:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,

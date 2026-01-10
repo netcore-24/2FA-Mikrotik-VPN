@@ -4,10 +4,18 @@
 from typing import Optional, List
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, or_, case
 from backend.models.vpn_session import VPNSession, VPNSessionStatus
 from backend.models.user import User, UserStatus
 from backend.services.user_service import get_user_by_id, get_user_settings
+from backend.services.mikrotik_service import (
+    enable_user_manager_user,
+    disable_user_manager_user,
+    terminate_active_sessions_for_username,
+    find_firewall_rule_by_comment,
+    enable_firewall_rule,
+    disable_firewall_rule,
+)
 
 
 def get_vpn_session_by_id(db: Session, session_id: str) -> Optional[VPNSession]:
@@ -61,8 +69,19 @@ def create_vpn_session(
         else:
             mikrotik_username = f"user_{user_id[:8]}"
     
+    # ВАЖНО: при запросе VPN включаем пользователя в User Manager ДО создания сессии.
+    # Если MikroTik недоступен/пользователь не найден — сессия в БД не должна появляться.
+    enable_user_manager_user(db, mikrotik_username)
+
     # Создаем новую сессию
     now = datetime.utcnow()
+    # Индивидуальная длительность сессии (если задана в user_settings) переопределяет duration_hours
+    try:
+        user_settings = get_user_settings(db, user_id)
+        if user_settings and getattr(user_settings, "session_duration_hours", None):
+            duration_hours = int(getattr(user_settings, "session_duration_hours"))
+    except Exception:
+        pass
     vpn_session = VPNSession(
         user_id=user_id,
         mikrotik_username=mikrotik_username,
@@ -70,8 +89,17 @@ def create_vpn_session(
         expires_at=now + timedelta(hours=duration_hours),
     )
     db.add(vpn_session)
-    db.commit()
-    db.refresh(vpn_session)
+    try:
+        db.commit()
+        db.refresh(vpn_session)
+    except Exception:
+        # Если сессию в БД создать не удалось — откатываем и пробуем вернуть MikroTik в безопасное состояние
+        db.rollback()
+        try:
+            disable_user_manager_user(db, mikrotik_username)
+        except Exception:
+            pass
+        raise
     
     return vpn_session
 
@@ -109,9 +137,19 @@ def update_vpn_session_status(
 def mark_session_as_connected(
     db: Session,
     session_id: str,
+    mikrotik_session_id: Optional[str] = None,
 ) -> Optional[VPNSession]:
     """Отметить сессию как подключенную."""
-    return update_vpn_session_status(db, session_id, VPNSessionStatus.CONNECTED)
+    session = update_vpn_session_status(db, session_id, VPNSessionStatus.CONNECTED)
+    if session and mikrotik_session_id:
+        try:
+            session.mikrotik_session_id = mikrotik_session_id
+            session.last_seen_at = datetime.utcnow()
+            db.commit()
+            db.refresh(session)
+        except Exception:
+            db.rollback()
+    return session
 
 
 def mark_session_as_confirmed(
@@ -124,12 +162,31 @@ def mark_session_as_confirmed(
         db, session_id, VPNSessionStatus.CONFIRMED, firewall_rule_id
     )
     if session:
+        # Если firewall_rule_id не задан, пробуем найти по комментарию пользователя
+        if not firewall_rule_id:
+            try:
+                user_settings = get_user_settings(db, session.user_id)
+                comment = user_settings.firewall_rule_comment if user_settings else None
+                if comment:
+                    rule = find_firewall_rule_by_comment(db, comment)
+                    if rule:
+                        rule_id = rule.get(".id") or rule.get("id")
+                        if not rule_id and rule.get("number") is not None:
+                            rule_id = str(rule.get("number"))
+                        if rule_id:
+                            enable_firewall_rule(db, rule_id)
+                            session.firewall_rule_id = rule_id
+                            db.commit()
+            except Exception:
+                # firewall может быть не настроен — не валим сессию
+                pass
+
         # Сразу делаем активной
         session = update_vpn_session_status(db, session_id, VPNSessionStatus.ACTIVE)
-        # Устанавливаем время истечения на основе настроек пользователя
+        # Устанавливаем время истечения на основе индивидуальной длительности сессии
         user_settings = get_user_settings(db, session.user_id)
-        reminder_hours = user_settings.reminder_interval_hours if user_settings else 6
-        session.expires_at = datetime.utcnow() + timedelta(hours=reminder_hours)
+        duration_hours = int(getattr(user_settings, "session_duration_hours", 24) or 24) if user_settings else 24
+        session.expires_at = datetime.utcnow() + timedelta(hours=duration_hours)
         db.commit()
         db.refresh(session)
     return session
@@ -142,10 +199,12 @@ def mark_session_reminder_sent(
     """Отметить, что напоминание отправлено."""
     session = update_vpn_session_status(db, session_id, VPNSessionStatus.REMINDER_SENT)
     if session:
-        # Обновляем время истечения
-        user_settings = get_user_settings(db, session.user_id)
-        reminder_hours = user_settings.reminder_interval_hours if user_settings else 6
-        session.expires_at = datetime.utcnow() + timedelta(hours=reminder_hours)
+        # Не меняем "время жизни" сессии: reminder_interval_hours — это про напоминания, а не TTL.
+        # Если expires_at ещё не установлен — зададим по индивидуальной длительности.
+        if not session.expires_at:
+            user_settings = get_user_settings(db, session.user_id)
+            duration_hours = int(getattr(user_settings, "session_duration_hours", 24) or 24) if user_settings else 24
+            session.expires_at = datetime.utcnow() + timedelta(hours=duration_hours)
         db.commit()
         db.refresh(session)
     return session
@@ -168,6 +227,23 @@ def disconnect_vpn_session(
     vpn_session.status = VPNSessionStatus.DISCONNECTED
     db.commit()
     db.refresh(vpn_session)
+
+    # При отключении — выключаем firewall rule и пользователя в User Manager
+    # (и дополнительно пытаемся принудительно завершить активную PPP/UM-сессию, если она ещё держится на роутере)
+    try:
+        if vpn_session.firewall_rule_id:
+            disable_firewall_rule(db, vpn_session.firewall_rule_id)
+    except Exception:
+        pass
+    try:
+        terminate_active_sessions_for_username(db, vpn_session.mikrotik_username)
+    except Exception:
+        pass
+    try:
+        disable_user_manager_user(db, vpn_session.mikrotik_username)
+    except Exception:
+        pass
+
     return vpn_session
 
 
@@ -183,6 +259,18 @@ def expire_vpn_session(
     vpn_session.status = VPNSessionStatus.EXPIRED
     db.commit()
     db.refresh(vpn_session)
+
+    # При истечении — выключаем firewall rule и пользователя в User Manager
+    try:
+        if vpn_session.firewall_rule_id:
+            disable_firewall_rule(db, vpn_session.firewall_rule_id)
+    except Exception:
+        pass
+    try:
+        disable_user_manager_user(db, vpn_session.mikrotik_username)
+    except Exception:
+        pass
+
     return vpn_session
 
 
@@ -220,15 +308,16 @@ def get_vpn_sessions(
     if user_id is not None:
         query = query.filter(VPNSession.user_id == user_id)
     
-    # Сортировка: сначала активные, потом по дате создания (новые первыми)
-    query = query.order_by(
-        VPNSession.status.in_([
-            VPNSessionStatus.ACTIVE,
-            VPNSessionStatus.CONFIRMED,
-            VPNSessionStatus.CONNECTED,
-        ]),
-        VPNSession.created_at.desc()
+    # Сортировка: активные/подключенные наверху, затем по дате (новые первыми).
+    status_rank = case(
+        (VPNSession.status == VPNSessionStatus.ACTIVE, 5),
+        (VPNSession.status == VPNSessionStatus.REMINDER_SENT, 4),
+        (VPNSession.status == VPNSessionStatus.CONFIRMED, 3),
+        (VPNSession.status == VPNSessionStatus.CONNECTED, 2),
+        (VPNSession.status == VPNSessionStatus.REQUESTED, 1),
+        else_=0,
     )
+    query = query.order_by(status_rank.desc(), VPNSession.created_at.desc())
     
     return query.offset(skip).limit(limit).all()
 

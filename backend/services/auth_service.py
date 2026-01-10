@@ -31,7 +31,9 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     else:
         expire = datetime.utcnow() + timedelta(minutes=settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire, "type": "access"})
-    encoded_jwt = jwt.encode(to_encode, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
+    # Используем JWT_SECRET_KEY если указан, иначе SECRET_KEY
+    secret_key = settings.JWT_SECRET_KEY or settings.SECRET_KEY
+    encoded_jwt = jwt.encode(to_encode, secret_key, algorithm=settings.JWT_ALGORITHM)
     return encoded_jwt
 
 
@@ -40,14 +42,18 @@ def create_refresh_token(data: dict) -> str:
     to_encode = data.copy()
     expire = datetime.utcnow() + timedelta(days=settings.JWT_REFRESH_TOKEN_EXPIRE_DAYS)
     to_encode.update({"exp": expire, "type": "refresh"})
-    encoded_jwt = jwt.encode(to_encode, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
+    # Используем JWT_SECRET_KEY если указан, иначе SECRET_KEY
+    secret_key = settings.JWT_SECRET_KEY or settings.SECRET_KEY
+    encoded_jwt = jwt.encode(to_encode, secret_key, algorithm=settings.JWT_ALGORITHM)
     return encoded_jwt
 
 
 def verify_token(token: str, token_type: str = "access") -> Optional[dict]:
     """Проверка и декодирование JWT токена."""
     try:
-        payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
+        # Используем JWT_SECRET_KEY если указан, иначе SECRET_KEY
+        secret_key = settings.JWT_SECRET_KEY or settings.SECRET_KEY
+        payload = jwt.decode(token, secret_key, algorithms=[settings.JWT_ALGORITHM])
         if payload.get("type") != token_type:
             return None
         return payload

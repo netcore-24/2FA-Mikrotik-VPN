@@ -24,11 +24,15 @@ const RegistrationRequestsPage = () => {
 
   const approveMutation = useMutation({
     mutationFn: async (requestId) => {
-      const response = await api.post(`/registration-requests/${requestId}/approve`)
+      // backend принимает approve без body
+      const response = await api.post(`/registration-requests/${requestId}/approve`, {})
       return response.data
     },
     onSuccess: () => {
       queryClient.invalidateQueries(['registration-requests'])
+    },
+    onError: (error) => {
+      alert(`Ошибка: ${error.response?.data?.detail || error.message}`)
     },
   })
 
@@ -46,7 +50,11 @@ const RegistrationRequestsPage = () => {
 
   const handleApprove = async (requestId) => {
     if (window.confirm('Одобрить заявку на регистрацию?')) {
-      await approveMutation.mutateAsync(requestId)
+      try {
+        await approveMutation.mutateAsync(requestId)
+      } catch (error) {
+        // onError уже покажет alert, но оставим на случай других обработчиков
+      }
     }
   }
 
@@ -70,11 +78,39 @@ const RegistrationRequestsPage = () => {
   }
 
   if (isLoading) {
-    return <div className="loading">Загрузка...</div>
+    return (
+      <div className="loading-container">
+        <div className="loading">Загрузка заявок...</div>
+      </div>
+    )
   }
 
   if (error) {
-    return <div className="error-message">Ошибка загрузки данных</div>
+    return (
+      <div className="table-page">
+        <div className="page-header">
+          <h2>Заявки на регистрацию</h2>
+        </div>
+        <div className="error-message">
+          ❌ Ошибка загрузки данных: {error.message || 'Неизвестная ошибка'}
+        </div>
+      </div>
+    )
+  }
+
+  if (!data?.items || data.items.length === 0) {
+    return (
+      <div className="table-page">
+        <div className="page-header">
+          <h2>Заявки на регистрацию</h2>
+        </div>
+        <div className="empty-state">
+          <div className="empty-state-icon">📝</div>
+          <h3 className="empty-state-title">Нет заявок на регистрацию</h3>
+          <p className="empty-state-description">Заявки будут отображаться здесь после того, как пользователи зарегистрируются через Telegram бота</p>
+        </div>
+      </div>
+    )
   }
 
   return (

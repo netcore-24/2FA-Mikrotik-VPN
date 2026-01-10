@@ -83,7 +83,11 @@ const StatsPage = () => {
   }
 
   if (overviewLoading || usersLoading || sessionsLoading) {
-    return <div className="loading">Загрузка статистики...</div>
+    return (
+      <div className="loading-container">
+        <div className="loading">Загрузка статистики...</div>
+      </div>
+    )
   }
 
   // Подготовка данных для графиков

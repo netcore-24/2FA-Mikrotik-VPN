@@ -56,6 +56,7 @@ async def login(
         access_token=access_token,
         refresh_token=refresh_token,
         token_type="bearer",
+        admin=AdminResponse.model_validate(admin),
     )
 
 
@@ -108,6 +109,7 @@ async def refresh_token(
         access_token=access_token,
         refresh_token=new_refresh_token,
         token_type="bearer",
+        admin=AdminResponse.model_validate(admin),
     )
 
 

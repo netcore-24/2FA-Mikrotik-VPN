@@ -50,9 +50,10 @@ async def list_settings(
     # Формируем ответы, расшифровывая значения
     items = []
     for setting in settings_list:
-        value = setting.value
-        # Расшифровываем только если не супер-администратор (для безопасности)
-        # В реальности лучше оставить как есть и расшифровывать только при необходимости
+        # Никогда не возвращаем зашифрованные значения "как есть" в списке,
+        # иначе в UI будет показываться fernet-токен (gAAAAA...), что выглядит как "билиберда"
+        # и повышает риск утечки секретов.
+        value = None if setting.is_encrypted else setting.value
         items.append(SettingResponse(
             id=setting.id,
             key=setting.key,

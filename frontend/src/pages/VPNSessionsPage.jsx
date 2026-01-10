@@ -13,6 +13,14 @@ const VPNSessionsPage = () => {
   const limit = 20
   const queryClient = useQueryClient()
 
+  const { data: vpnSettingsDict } = useQuery({
+    queryKey: ['settings', 'dict', 'vpn'],
+    queryFn: async () => {
+      const response = await api.get('/settings/dict', { params: { category: 'vpn' } })
+      return response.data?.settings || {}
+    },
+  })
+
   const { data, isLoading } = useQuery({
     queryKey: ['vpn-sessions', page, statusFilter],
     queryFn: async () => {
@@ -82,8 +90,39 @@ const VPNSessionsPage = () => {
     return labels[status] || status
   }
 
+  const getMikrotikStatus = (session) => {
+    const lastSeen = session?.mikrotik_last_seen_at ? new Date(session.mikrotik_last_seen_at) : null
+    if (!lastSeen || Number.isNaN(lastSeen.getTime())) return { label: '—', badge: 'status-pending', ts: null }
+    const interval = Number(vpnSettingsDict?.vpn_connection_check_interval_seconds || 10)
+    const thresholdSeconds = Math.max(30, interval * 2) // соответствует логике grace в scheduler
+    const ageSeconds = (Date.now() - lastSeen.getTime()) / 1000
+    if (ageSeconds <= thresholdSeconds) {
+      return { label: 'Активна', badge: 'status-active', ts: lastSeen }
+    }
+    return { label: 'Нет', badge: 'status-rejected', ts: lastSeen }
+  }
+
   if (isLoading) {
-    return <div className="loading">Загрузка...</div>
+    return (
+      <div className="loading-container">
+        <div className="loading">Загрузка VPN сессий...</div>
+      </div>
+    )
+  }
+
+  if (!data?.items || data.items.length === 0) {
+    return (
+      <div className="table-page">
+        <div className="page-header">
+          <h2>VPN Сессии</h2>
+        </div>
+        <div className="empty-state">
+          <div className="empty-state-icon">🔒</div>
+          <h3 className="empty-state-title">Нет VPN сессий</h3>
+          <p className="empty-state-description">VPN сессии будут отображаться здесь после того, как пользователи запросят подключение через Telegram бота</p>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -118,13 +157,14 @@ const VPNSessionsPage = () => {
             <button
               className="action-btn"
               onClick={() => {
-                const headers = ['ID', 'User ID', 'Пользователь', 'MikroTik Username', 'Статус', 'Создана', 'Истекает']
+                const headers = ['ID', 'User ID', 'Пользователь', 'MikroTik Username', 'Статус', 'MikroTik (факт)', 'Создана', 'Истекает']
                 const rows = (data?.items || []).map((session) => [
                   session.id,
                   session.user_id,
                   session.user?.full_name || session.user?.telegram_id || '-',
                   session.mikrotik_username || '-',
                   session.status,
+                  getMikrotikStatus(session).label,
                   new Date(session.created_at).toLocaleString('ru-RU'),
                   session.expires_at ? new Date(session.expires_at).toLocaleString('ru-RU') : '-',
                 ])
@@ -136,13 +176,14 @@ const VPNSessionsPage = () => {
             <button
               className="action-btn"
               onClick={() => {
-                const headers = ['ID', 'User ID', 'Пользователь', 'MikroTik Username', 'Статус', 'Создана', 'Истекает']
+                const headers = ['ID', 'User ID', 'Пользователь', 'MikroTik Username', 'Статус', 'MikroTik (факт)', 'Создана', 'Истекает']
                 const rows = (data?.items || []).map((session) => [
                   session.id,
                   session.user_id,
                   session.user?.full_name || session.user?.telegram_id || '-',
                   session.mikrotik_username || '-',
                   session.status,
+                  getMikrotikStatus(session).label,
                   new Date(session.created_at).toLocaleString('ru-RU'),
                   session.expires_at ? new Date(session.expires_at).toLocaleString('ru-RU') : '-',
                 ])
@@ -162,6 +203,7 @@ const VPNSessionsPage = () => {
               <th>ID</th>
               <th>Пользователь</th>
               <th>MikroTik Username</th>
+              <th>Сессия на MikroTik</th>
               <th>Статус</th>
               <th>Создана</th>
               <th>Истекает</th>
@@ -183,6 +225,21 @@ const VPNSessionsPage = () => {
                     {session.user?.full_name || session.user?.telegram_id || '-'}
                   </td>
                   <td>{session.mikrotik_username || '-'}</td>
+                  <td>
+                    {(() => {
+                      const ms = getMikrotikStatus(session)
+                      return (
+                        <div>
+                          <span className={`status-badge ${ms.badge}`}>{ms.label}</span>
+                          {ms.ts && (
+                            <div style={{ fontSize: '0.85rem', opacity: 0.8, marginTop: '0.15rem' }}>
+                              last seen: {ms.ts.toLocaleString('ru-RU')}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })()}
+                  </td>
                   <td>
                     <span className={`status-badge status-${session.status}`}>
                       {getStatusLabel(session.status)}

@@ -62,13 +62,16 @@ def get_translation(language: str = 'ru'):
                     return get_translation("ru")(key, **kwargs)
                 return key
         
-        if kwargs and isinstance(value, str):
-            try:
-                return value.format(**kwargs)
-            except (KeyError, ValueError):
-                return value
-        
-        return value if isinstance(value, str) else key
+        if isinstance(value, str):
+            # В messages.json переводы часто содержат литералы "\\n"
+            value = value.replace("\\n", "\n")
+            if kwargs:
+                try:
+                    return value.format(**kwargs)
+                except (KeyError, ValueError):
+                    return value
+            return value
+        return key
     
     return translate
 
@@ -114,10 +117,13 @@ def translate(key: str, user_id: Optional[int] = None, language: Optional[str] =
             return key
     
     # Форматируем строку, если есть параметры
-    if kwargs and isinstance(value, str):
-        try:
-            return value.format(**kwargs)
-        except (KeyError, ValueError):
-            return value
-    
-    return value if isinstance(value, str) else key
+    if isinstance(value, str):
+        # В messages.json переводы часто содержат литералы "\\n"
+        value = value.replace("\\n", "\n")
+        if kwargs:
+            try:
+                return value.format(**kwargs)
+            except (KeyError, ValueError):
+                return value
+        return value
+    return key

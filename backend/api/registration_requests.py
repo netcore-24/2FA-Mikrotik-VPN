@@ -10,7 +10,6 @@ from backend.api.i18n_dependencies import get_translate
 from backend.api.schemas import (
     RegistrationRequestCreate,
     RegistrationRequestResponse,
-    RegistrationRequestApprove,
     RegistrationRequestReject,
     RegistrationRequestListResponse,
     UserResponse,
@@ -116,7 +115,6 @@ async def get_registration_request(
 @router.post("/{request_id}/approve", response_model=RegistrationRequestResponse)
 async def approve_registration(
     request_id: str,
-    approve_data: RegistrationRequestApprove,
     request: Request,
     db: Session = Depends(get_db),
     current_admin: Admin = Depends(get_current_admin),

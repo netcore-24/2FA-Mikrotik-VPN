@@ -24,12 +24,17 @@ class VPNSession(Base, UUIDMixin, TimestampMixin):
     
     user_id = Column(String(36), ForeignKey("users.id"), nullable=False, index=True)
     mikrotik_username = Column(String(100), nullable=False)
+    # ID сессии на MikroTik (".id" из /ppp active или /user-manager session)
+    mikrotik_session_id = Column(String(64), nullable=True, index=True)
     status = Column(SQLEnum(VPNSessionStatus), default=VPNSessionStatus.REQUESTED, nullable=False)
     
     connected_at = Column(DateTime, nullable=True)
     confirmed_at = Column(DateTime, nullable=True)
     expires_at = Column(DateTime, nullable=True)
     reminder_sent_at = Column(DateTime, nullable=True)
+    # Последний момент, когда мы видели активную сессию на MikroTik для этого username.
+    # Нужен для защиты от ложных "disconnected" при кратковременных сбоях связи/учёта.
+    last_seen_at = Column(DateTime, nullable=True)
     
     firewall_rule_id = Column(String(100), nullable=True)
     

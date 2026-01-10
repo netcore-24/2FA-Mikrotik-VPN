@@ -199,6 +199,7 @@
     "buttons": {
       "register": "Зарегистрироваться",
       "request_vpn": "Запросить VPN",
+      "disable_vpn_access": "Отключить доступ к VPN",
       "my_sessions": "Мои сессии",
       "status": "Статус",
       "disconnect": "Отключить"

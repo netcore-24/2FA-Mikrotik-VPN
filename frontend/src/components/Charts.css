@@ -14,6 +14,16 @@
   font-weight: 600;
 }
 
+.chart-empty {
+  height: 300px;
+  display: grid;
+  place-items: center;
+  color: var(--text-secondary);
+  border: 1px dashed var(--border-color);
+  border-radius: 0.75rem;
+  background: var(--bg-color);
+}
+
 /* Recharts стили */
 .recharts-wrapper {
   margin: 0 auto;

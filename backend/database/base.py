@@ -11,6 +11,7 @@ from backend.models import (
     Setting,
     UserSetting,
     AuditLog,
+    UserMikrotikAccount,
 )
 
 __all__ = ["Base"]

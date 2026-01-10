@@ -17,5 +17,16 @@ export default defineConfig({
     outDir: 'dist',
     assetsDir: 'assets',
     sourcemap: false,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+          'query-vendor': ['@tanstack/react-query'],
+          'chart-vendor': ['recharts'],
+          'utils-vendor': ['axios', 'zustand', 'xlsx'],
+        },
+      },
+    },
+    chunkSizeWarningLimit: 1000,
   },
 })

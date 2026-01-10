@@ -8,12 +8,15 @@
   background: var(--card-bg);
   border-radius: 0.75rem;
   box-shadow: var(--shadow);
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
 }
 
 .settings-table {
   width: 100%;
   border-collapse: collapse;
+  min-width: 720px;
 }
 
 .settings-table thead {

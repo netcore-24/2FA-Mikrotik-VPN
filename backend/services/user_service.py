@@ -48,6 +48,7 @@ def create_user(
     user_setting = UserSetting(
         user_id=user.id,
         reminder_interval_hours=6,
+        session_duration_hours=24,
     )
     db.add(user_setting)
     db.commit()
@@ -170,7 +171,9 @@ def update_user_settings(
     db: Session,
     user_id: str,
     firewall_rule_comment: Optional[str] = None,
+    require_confirmation: Optional[bool] = None,
     reminder_interval_hours: Optional[int] = None,
+    session_duration_hours: Optional[int] = None,
     custom_notification_text: Optional[str] = None,
 ) -> Optional[UserSetting]:
     """Обновить настройки пользователя."""
@@ -184,8 +187,12 @@ def update_user_settings(
     
     if firewall_rule_comment is not None:
         user_setting.firewall_rule_comment = firewall_rule_comment
+    if require_confirmation is not None:
+        user_setting.require_confirmation = bool(require_confirmation)
     if reminder_interval_hours is not None:
         user_setting.reminder_interval_hours = reminder_interval_hours
+    if session_duration_hours is not None:
+        user_setting.session_duration_hours = session_duration_hours
     if custom_notification_text is not None:
         user_setting.custom_notification_text = custom_notification_text
     

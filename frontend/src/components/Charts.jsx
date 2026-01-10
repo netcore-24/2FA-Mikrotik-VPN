@@ -16,11 +16,33 @@ import {
 
 const COLORS = ['#667eea', '#764ba2', '#f093fb', '#4facfe', '#00f2fe', '#43e97b', '#fa709a']
 
+const STATUS_COLORS = {
+  pending: '#667eea',
+  approved: '#764ba2',
+  rejected: '#f093fb',
+  active: '#4facfe',
+  inactive: '#00f2fe',
+}
+
+const getColorByName = (name, index) => STATUS_COLORS[name] || COLORS[index % COLORS.length]
+
 export const StatusPieChart = ({ data, title }) => {
-  const chartData = Object.entries(data || {}).map(([name, value]) => ({
+  const rawData = Object.entries(data || {}).map(([name, value]) => ({
     name,
-    value,
+    value: Number(value) || 0,
   }))
+
+  // Убираем нулевые сегменты, иначе подписи для 0% накладываются друг на друга
+  const pieData = rawData.filter((d) => d.value > 0)
+
+  if (pieData.length === 0) {
+    return (
+      <div className="chart-container">
+        <h4>{title}</h4>
+        <div className="chart-empty">Нет данных для отображения</div>
+      </div>
+    )
+  }
 
   return (
     <div className="chart-container">
@@ -28,7 +50,7 @@ export const StatusPieChart = ({ data, title }) => {
       <ResponsiveContainer width="100%" height={300}>
         <PieChart>
           <Pie
-            data={chartData}
+            data={pieData}
             cx="50%"
             cy="50%"
             labelLine={false}
@@ -37,12 +59,19 @@ export const StatusPieChart = ({ data, title }) => {
             fill="#8884d8"
             dataKey="value"
           >
-            {chartData.map((entry, index) => (
-              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+            {pieData.map((entry, index) => (
+              <Cell key={`cell-${entry.name}`} fill={getColorByName(entry.name, index)} />
             ))}
           </Pie>
           <Tooltip />
-          <Legend />
+          <Legend
+            payload={rawData.map((entry, index) => ({
+              id: entry.name,
+              type: 'square',
+              value: entry.name,
+              color: getColorByName(entry.name, index),
+            }))}
+          />
         </PieChart>
       </ResponsiveContainer>
     </div>

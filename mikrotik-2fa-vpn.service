@@ -5,9 +5,9 @@ After=network.target
 [Service]
 Type=simple
 User=root
-WorkingDirectory=/opt/mikrotik-2fa-vpn
-Environment="PATH=/opt/mikrotik-2fa-vpn/venv/bin"
-ExecStart=/opt/mikrotik-2fa-vpn/venv/bin/uvicorn backend.main:app --host 0.0.0.0 --port 8000
+WorkingDirectory=/root/mikrotik-2fa-vpn
+Environment="PATH=/root/mikrotik-2fa-vpn/venv/bin"
+ExecStart=/root/mikrotik-2fa-vpn/venv/bin/uvicorn backend.main:app --host 0.0.0.0 --port 8000
 Restart=always
 RestartSec=10
 

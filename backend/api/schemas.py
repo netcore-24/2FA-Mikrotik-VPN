@@ -2,7 +2,7 @@
 Pydantic схемы для валидации данных API.
 """
 from pydantic import BaseModel, EmailStr
-from typing import Optional, Any
+from typing import Optional, Any, Dict
 from datetime import datetime
 
 
@@ -12,6 +12,7 @@ class Token(BaseModel):
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
+    admin: Optional["AdminResponse"] = None
 
 
 class TokenData(BaseModel):
@@ -75,6 +76,7 @@ class UserUpdate(BaseModel):
     phone: Optional[str] = None
     email: Optional[EmailStr] = None
     status: Optional[str] = None
+    mikrotik_usernames: Optional[list[str]] = None
 
 
 class UserResponse(BaseModel):
@@ -89,6 +91,10 @@ class UserResponse(BaseModel):
     updated_at: datetime
     approved_at: Optional[datetime] = None
     rejected_reason: Optional[str] = None
+    mikrotik_usernames: list[str] = []
+    # Настройки (для отображения в списках)
+    require_confirmation: Optional[bool] = None
+    firewall_rule_comment: Optional[str] = None
     
     model_config = {"from_attributes": True}
 
@@ -171,6 +177,8 @@ class VPNSessionResponse(BaseModel):
     id: str
     user_id: str
     mikrotik_username: str
+    mikrotik_session_id: Optional[str] = None
+    mikrotik_last_seen_at: Optional[datetime] = None
     status: str
     connected_at: Optional[datetime] = None
     confirmed_at: Optional[datetime] = None
@@ -311,28 +319,45 @@ class MikroTikUserResponse(BaseModel):
     """Схема ответа с пользователем MikroTik."""
     name: str
     profile: Optional[str] = None
-    disabled: Optional[str] = None
+    disabled: Optional[bool] = None
+    number: Optional[int] = None
     data: Optional[dict[str, Any]] = None
 
 
 class MikroTikUserListResponse(BaseModel):
     """Схема ответа со списком пользователей MikroTik."""
     users: list[MikroTikUserResponse]
+    source: Optional[str] = None
+    warning: Optional[str] = None
 
 
 class MikroTikFirewallRuleResponse(BaseModel):
     """Схема ответа с правилом firewall MikroTik."""
     id: Optional[str] = None
+    number: Optional[int] = None
     chain: Optional[str] = None
     action: Optional[str] = None
     comment: Optional[str] = None
-    disabled: Optional[str] = None
+    disabled: Optional[bool] = None
     data: Optional[dict[str, Any]] = None
 
 
 class MikroTikFirewallRuleListResponse(BaseModel):
     """Схема ответа со списком правил firewall."""
     rules: list[MikroTikFirewallRuleResponse]
+
+
+class MikroTikFirewallRuleBinding(BaseModel):
+    """Связь firewall-правила (по comment) с пользователем системы."""
+    user_id: str
+    telegram_id: Optional[int] = None
+    full_name: Optional[str] = None
+    firewall_rule_comment: str
+
+
+class MikroTikFirewallRuleAssignRequest(BaseModel):
+    """Запрос на привязку firewall-правила к пользователю."""
+    user_id: Optional[str] = None
 
 
 class MikroTikUserCreate(BaseModel):
@@ -376,6 +401,7 @@ class StatsOverviewResponse(BaseModel):
     active_sessions: int
     total_registration_requests: int
     pending_registration_requests: int
+    mikrotik_active_sessions: Optional[int] = None
 
 
 class StatsUsersResponse(BaseModel):
@@ -455,6 +481,8 @@ class SetupWizardStatusResponse(BaseModel):
     current_step: str
     completed_steps: list[str]
     total_steps: int
+    can_restart: Optional[bool] = True  # Всегда можно перезапустить
+    was_completed_before: Optional[bool] = False  # Был ли мастер завершен ранее
 
 
 class SetupWizardStepResponse(BaseModel):
@@ -492,6 +520,15 @@ class SetupWizardStepData(BaseModel):
     mikrotik_password: Optional[str] = None
     mikrotik_ssh_key_path: Optional[str] = None
     connection_type: Optional[str] = None
+    notification_method: Optional[str] = None
+    notification_email: Optional[str] = None
+    telegram_other_token: Optional[str] = None
+    telegram_other_chat_id: Optional[str] = None
+    domain_name: Optional[str] = None
+    backup_enabled: Optional[bool] = None
+    backup_interval_hours: Optional[int] = None
+    log_level: Optional[str] = None
+    connection_type: Optional[str] = None
     mikrotik_user_prefix: Optional[str] = None
     mikrotik_firewall_comment_template: Optional[str] = None
     notification_types: Optional[list[str]] = None
@@ -511,3 +548,36 @@ class SetupWizardTestResponse(BaseModel):
     """Схема ответа на тест подключения."""
     success: bool
     message: Optional[str] = None
+
+
+# Схемы для сопоставления пользователей
+class UserMappingBase(BaseModel):
+    """Базовая схема сопоставления пользователя."""
+    telegram_user_id: str
+    mikrotik_username: str
+
+
+class UserMappingCreate(UserMappingBase):
+    """Схема создания сопоставления пользователя."""
+    pass
+
+
+class UserMappingResponse(UserMappingBase):
+    """Схема ответа с данными сопоставления."""
+    id: str
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+    telegram_user_full_name: Optional[str] = None
+    telegram_user_email: Optional[str] = None
+    telegram_user_phone: Optional[str] = None
+    
+    model_config = {"from_attributes": True}
+
+
+class UserMappingListResponse(BaseModel):
+    """Схема ответа со списком сопоставлений."""
+    items: list[UserMappingResponse]
+    total: int
+    skip: int
+    limit: int

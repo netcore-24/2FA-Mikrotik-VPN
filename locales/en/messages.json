@@ -199,6 +199,7 @@
     "buttons": {
       "register": "Register",
       "request_vpn": "Request VPN",
+      "disable_vpn_access": "Disable VPN access",
       "my_sessions": "My Sessions",
       "status": "Status",
       "disconnect": "Disconnect"

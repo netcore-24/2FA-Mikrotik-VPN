@@ -1,9 +1,9 @@
 """
 API endpoints для мастера настройки (Setup Wizard).
 """
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Query, Body
 from sqlalchemy.orm import Session
-from typing import Optional
+from typing import Optional, Dict, Any
 from backend.database import get_db
 from backend.api.dependencies import get_current_admin, get_current_super_admin
 from backend.api.i18n_dependencies import get_translate
@@ -97,7 +97,16 @@ async def complete_setup_wizard_step_endpoint(
     try:
         result = complete_setup_wizard_step(db, step_id, data_dict)
         return SetupWizardStepCompleteResponse(**result)
+    except ValueError as e:
+        # Ошибки валидации (например, не удалось создать/обновить администратора)
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e) or t("error.validation_failed"),
+        )
     except Exception as e:
+        # Общие ошибки
+        db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e) or t("error.internal"),
@@ -133,15 +142,17 @@ async def complete_setup_wizard_endpoint(
     try:
         result = complete_setup_wizard_step(db, "review", {})
         
-        # Проверяем, что все обязательные шаги выполнены
-        status_data = get_setup_wizard_status(db)
-        if not status_data["is_completed"]:
+        # Проверяем результат завершения шага review
+        if not result.get("success", False):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Not all required steps are completed",
+                detail=result.get("message", "Not all required steps are completed"),
             )
         
-        return {"message": t("setup_wizard.completed"), "status": status_data}
+        # Получаем обновленный статус
+        status_data = get_setup_wizard_status(db)
+        
+        return {"message": t("setup_wizard.completed") or "Setup wizard completed successfully", "status": status_data}
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -151,47 +162,163 @@ async def complete_setup_wizard_endpoint(
 
 @router.post("/test/telegram", response_model=SetupWizardTestResponse)
 async def test_telegram_connection_endpoint(
-    token: str,
     request: Request,
+    token: Optional[str] = Query(None, description="Telegram bot token to test"),
     db: Session = Depends(get_db),
     current_admin: Admin = Depends(get_current_admin),
     t=Depends(get_translate),
 ):
     """
     Протестировать подключение к Telegram API с токеном.
+    Если токен не указан в query параметре, использует сохраненный токен из настроек.
+    Также можно передать токен в теле запроса как JSON: {"token": "..."}
     """
-    success, error_message = test_telegram_connection(token)
+    # Проверяем, есть ли токен в query параметре
+    if not token:
+        # Пробуем получить из body запроса
+        try:
+            body = await request.json()
+            token = body.get("token")
+        except:
+            pass
+    
+    # Если токен все еще не найден, получаем из настроек БД
+    if not token:
+        from backend.services.settings_service import get_setting_value
+        token = get_setting_value(db, "telegram_bot_token")
+        if not token:
+            return SetupWizardTestResponse(
+                success=False,
+                message=t("setup_wizard.telegram.token_not_set") or "Telegram bot token not configured. Please provide token.",
+            )
+    
+    if not token or not token.strip():
+        return SetupWizardTestResponse(
+            success=False,
+            message=t("validation.required") or "Token is required",
+        )
+    
+    success, error_message = test_telegram_connection(token.strip())
     
     if success:
         return SetupWizardTestResponse(
             success=True,
-            message=t("mikrotik.config.test_success"),  # TODO: добавить отдельный перевод
+            message=t("setup_wizard.test.telegram_success") or "Telegram bot connection successful",
         )
     else:
         return SetupWizardTestResponse(
             success=False,
-            message=error_message or t("mikrotik.config.test_failed"),
+            message=error_message or (t("setup_wizard.test.telegram_failed") or "Telegram bot connection failed"),
         )
 
 
 @router.post("/test/mikrotik", response_model=SetupWizardTestResponse)
 async def test_mikrotik_connection_endpoint(
-    config_id: Optional[str] = None,
-    request: Request = None,
+    request: Request,
+    config_id: Optional[str] = Query(None),
+    test_params: Optional[Dict[str, Any]] = Body(None),
     db: Session = Depends(get_db),
     current_admin: Admin = Depends(get_current_admin),
     t=Depends(get_translate),
 ):
     """
     Протестировать подключение к MikroTik.
-    Если config_id не указан, использует активную конфигурацию.
+    Может принимать параметры подключения из тела запроса для тестирования перед сохранением.
+    Если параметры не переданы, использует сохраненную конфигурацию.
     """
+    # Пробуем получить параметры подключения из тела запроса (для тестирования перед сохранением)
+    body = test_params
+    if not body:
+        try:
+            body = await request.json()
+        except:
+            body = None
+    
+    # Если в body есть параметры подключения, тестируем с ними
+    if body and ("host" in body or "mikrotik_host" in body):
+        # Тестируем с временными параметрами из формы мастера настройки
+        host = body.get("host") or body.get("mikrotik_host")
+        port = body.get("port") or body.get("mikrotik_port", 22)
+        username = body.get("username") or body.get("mikrotik_username")
+        password = body.get("password") or body.get("mikrotik_password") or ""
+        connection_type = body.get("connection_type", "ssh_password")
+        
+        if not host or not username:
+            return SetupWizardTestResponse(
+                success=False,
+                message="Необходимо указать хост и имя пользователя",
+            )
+        
+        # Тестируем подключение напрямую
+        try:
+            # Нормализуем тип подключения
+            if connection_type in ["api", "rest_api"]:
+                import requests
+                from requests.auth import HTTPDigestAuth
+                from requests.packages.urllib3.exceptions import InsecureRequestWarning
+                import urllib3
+                urllib3.disable_warnings(InsecureRequestWarning)
+                
+                url = f"http://{host}:{port}/rest/system/identity"
+                response = requests.get(
+                    url, 
+                    auth=HTTPDigestAuth(username, password), 
+                    timeout=10, 
+                    verify=False
+                )
+                success = response.status_code == 200
+                error_message = None if success else f"HTTP {response.status_code}: {response.text[:200]}"
+            else:
+                # SSH подключение
+                import paramiko
+                ssh = paramiko.SSHClient()
+                ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+                try:
+                    ssh.connect(
+                        hostname=host, 
+                        port=int(port), 
+                        username=username, 
+                        password=password, 
+                        timeout=10,
+                        look_for_keys=False,
+                        allow_agent=False
+                    )
+                    ssh.close()
+                    success = True
+                    error_message = None
+                except paramiko.AuthenticationException:
+                    success = False
+                    error_message = "Ошибка аутентификации. Проверьте имя пользователя и пароль."
+                except paramiko.SSHException as e:
+                    success = False
+                    error_message = f"Ошибка SSH подключения: {str(e)}"
+                except Exception as e:
+                    success = False
+                    error_message = f"Ошибка подключения: {str(e)}"
+            
+            if success:
+                return SetupWizardTestResponse(
+                    success=True,
+                    message=t("mikrotik.config.test_success") or "Подключение к MikroTik успешно!",
+                )
+            else:
+                return SetupWizardTestResponse(
+                    success=False,
+                    message=error_message or t("mikrotik.config.test_failed") or "Не удалось подключиться к MikroTik",
+                )
+        except Exception as e:
+            return SetupWizardTestResponse(
+                success=False,
+                message=f"Ошибка подключения: {str(e)}",
+            )
+    
+    # Стандартная логика - тестирование сохраненной конфигурации
     if not config_id:
         active_config = get_active_mikrotik_config(db)
         if not active_config:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=t("mikrotik.config.not_found"),
+            return SetupWizardTestResponse(
+                success=False,
+                message="Конфигурация MikroTik не найдена. Сохраните настройки сначала.",
             )
         config_id = active_config.id
     
@@ -200,10 +327,10 @@ async def test_mikrotik_connection_endpoint(
     if success:
         return SetupWizardTestResponse(
             success=True,
-            message=t("mikrotik.config.test_success"),
+            message=t("mikrotik.config.test_success") or "Подключение к MikroTik успешно!",
         )
     else:
         return SetupWizardTestResponse(
             success=False,
-            message=error_message or t("mikrotik.config.test_failed"),
+            message=error_message or t("mikrotik.config.test_failed") or "Не удалось подключиться к MikroTik",
         )

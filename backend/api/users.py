@@ -22,6 +22,10 @@ from backend.services.user_service import (
     get_user_settings,
     update_user_settings,
 )
+from backend.services.user_mikrotik_account_service import (
+    get_user_mikrotik_usernames,
+    set_user_mikrotik_usernames,
+)
 from backend.models.user import UserStatus
 from backend.models.admin import Admin
 
@@ -65,6 +69,8 @@ async def list_users(
     # Преобразуем enum статуса в строку для каждого пользователя
     items = []
     for user in users:
+        mikrotik_usernames = get_user_mikrotik_usernames(db, user.id)
+        user_settings = get_user_settings(db, user.id)
         user_dict = {
             "id": user.id,
             "telegram_id": user.telegram_id,
@@ -76,6 +82,9 @@ async def list_users(
             "updated_at": user.updated_at,
             "approved_at": user.approved_at,
             "rejected_reason": user.rejected_reason,
+            "mikrotik_usernames": mikrotik_usernames,
+            "require_confirmation": getattr(user_settings, "require_confirmation", None) if user_settings else None,
+            "firewall_rule_comment": user_settings.firewall_rule_comment if user_settings else None,
         }
         items.append(UserResponse(**user_dict))
     
@@ -106,6 +115,8 @@ async def get_user(
         )
     
     # Преобразуем enum статуса в строку
+    mikrotik_usernames = get_user_mikrotik_usernames(db, user.id)
+    user_settings = get_user_settings(db, user.id)
     user_dict = {
         "id": user.id,
         "telegram_id": user.telegram_id,
@@ -117,6 +128,9 @@ async def get_user(
         "updated_at": user.updated_at,
         "approved_at": user.approved_at,
         "rejected_reason": user.rejected_reason,
+        "mikrotik_usernames": mikrotik_usernames,
+        "require_confirmation": getattr(user_settings, "require_confirmation", None) if user_settings else None,
+        "firewall_rule_comment": user_settings.firewall_rule_comment if user_settings else None,
     }
     return UserResponse(**user_dict)
 
@@ -166,6 +180,15 @@ async def update_user_data(
             detail=t("user.not_found"),
         )
     
+    # Обновляем привязки MikroTik (до 2), если пришли в запросе
+    if user_update.mikrotik_usernames is not None:
+        try:
+            set_user_mikrotik_usernames(db, user_id, user_update.mikrotik_usernames)
+        except ValueError as e:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+    mikrotik_usernames = get_user_mikrotik_usernames(db, user_id)
+    user_settings = get_user_settings(db, user_id)
     user_dict = {
         "id": updated_user.id,
         "telegram_id": updated_user.telegram_id,
@@ -177,6 +200,9 @@ async def update_user_data(
         "updated_at": updated_user.updated_at,
         "approved_at": updated_user.approved_at,
         "rejected_reason": updated_user.rejected_reason,
+        "mikrotik_usernames": mikrotik_usernames,
+        "require_confirmation": getattr(user_settings, "require_confirmation", None) if user_settings else None,
+        "firewall_rule_comment": user_settings.firewall_rule_comment if user_settings else None,
     }
     return UserResponse(**user_dict)
 
@@ -281,14 +307,18 @@ async def get_user_settings_endpoint(
         return {
             "user_id": user_id,
             "firewall_rule_comment": None,
+            "require_confirmation": False,
             "reminder_interval_hours": 6,
+            "session_duration_hours": 24,
             "custom_notification_text": None,
         }
     
     return {
         "user_id": user_settings.user_id,
         "firewall_rule_comment": user_settings.firewall_rule_comment,
+        "require_confirmation": getattr(user_settings, "require_confirmation", False),
         "reminder_interval_hours": user_settings.reminder_interval_hours,
+        "session_duration_hours": getattr(user_settings, "session_duration_hours", 24),
         "custom_notification_text": user_settings.custom_notification_text,
     }
 
@@ -297,7 +327,9 @@ async def get_user_settings_endpoint(
 async def update_user_settings_endpoint(
     user_id: str,
     firewall_rule_comment: Optional[str] = None,
+    require_confirmation: Optional[bool] = None,
     reminder_interval_hours: Optional[int] = None,
+    session_duration_hours: Optional[int] = None,
     custom_notification_text: Optional[str] = None,
     request: Request = None,
     db: Session = Depends(get_db),
@@ -318,7 +350,9 @@ async def update_user_settings_endpoint(
         db=db,
         user_id=user_id,
         firewall_rule_comment=firewall_rule_comment,
+        require_confirmation=require_confirmation,
         reminder_interval_hours=reminder_interval_hours,
+        session_duration_hours=session_duration_hours,
         custom_notification_text=custom_notification_text,
     )
     
@@ -333,7 +367,9 @@ async def update_user_settings_endpoint(
         "settings": {
             "user_id": updated_settings.user_id,
             "firewall_rule_comment": updated_settings.firewall_rule_comment,
+            "require_confirmation": getattr(updated_settings, "require_confirmation", False),
             "reminder_interval_hours": updated_settings.reminder_interval_hours,
+            "session_duration_hours": getattr(updated_settings, "session_duration_hours", 24),
             "custom_notification_text": updated_settings.custom_notification_text,
         },
     }

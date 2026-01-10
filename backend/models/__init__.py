@@ -10,6 +10,8 @@ from .mikrotik_config import MikroTikConfig
 from .setting import Setting
 from .user_setting import UserSetting
 from .audit_log import AuditLog
+from .user_mapping import UserMapping
+from .user_mikrotik_account import UserMikrotikAccount
 
 __all__ = [
     "Base",
@@ -21,4 +23,6 @@ __all__ = [
     "Setting",
     "UserSetting",
     "AuditLog",
+    "UserMapping",
+    "UserMikrotikAccount",
 ]

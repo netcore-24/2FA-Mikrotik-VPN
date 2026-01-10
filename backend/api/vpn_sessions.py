@@ -4,6 +4,7 @@ API endpoints для управления VPN сессиями.
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
 from sqlalchemy.orm import Session
 from typing import Optional
+from datetime import datetime, timezone
 from backend.database import get_db
 from backend.api.dependencies import get_current_admin
 from backend.api.i18n_dependencies import get_translate
@@ -33,6 +34,19 @@ from backend.models.vpn_session import VPNSessionStatus
 from backend.models.admin import Admin
 
 router = APIRouter(prefix="/vpn-sessions", tags=["vpn-sessions"])
+
+def _ensure_utc(dt: datetime | None) -> datetime | None:
+    """
+    UI считает "активность" по разнице Date.now - last_seen.
+    Если отдавать naive datetime (без tz), браузер интерпретирует его как локальный часовой пояс,
+    что ломает вычисления (сервер хранит UTC).
+    Поэтому в API всегда отдаём UTC-aware datetime.
+    """
+    if not dt:
+        return None
+    if getattr(dt, "tzinfo", None) is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
 
 
 @router.get("", response_model=VPNSessionListResponse)
@@ -76,6 +90,8 @@ async def list_vpn_sessions(
             "id": session.id,
             "user_id": session.user_id,
             "mikrotik_username": session.mikrotik_username,
+            "mikrotik_session_id": getattr(session, "mikrotik_session_id", None),
+            "mikrotik_last_seen_at": _ensure_utc(getattr(session, "last_seen_at", None)),
             "status": session.status.value,
             "connected_at": session.connected_at,
             "confirmed_at": session.confirmed_at,
@@ -125,6 +141,8 @@ async def get_active_vpn_sessions_endpoint(
             "id": session.id,
             "user_id": session.user_id,
             "mikrotik_username": session.mikrotik_username,
+            "mikrotik_session_id": getattr(session, "mikrotik_session_id", None),
+            "mikrotik_last_seen_at": _ensure_utc(getattr(session, "last_seen_at", None)),
             "status": session.status.value,
             "connected_at": session.connected_at,
             "confirmed_at": session.confirmed_at,
@@ -178,6 +196,8 @@ async def get_vpn_session(
         "id": vpn_session.id,
         "user_id": vpn_session.user_id,
         "mikrotik_username": vpn_session.mikrotik_username,
+        "mikrotik_session_id": getattr(vpn_session, "mikrotik_session_id", None),
+        "mikrotik_last_seen_at": _ensure_utc(getattr(vpn_session, "last_seen_at", None)),
         "status": vpn_session.status.value,
         "connected_at": vpn_session.connected_at,
         "confirmed_at": vpn_session.confirmed_at,

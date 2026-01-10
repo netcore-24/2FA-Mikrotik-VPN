@@ -61,4 +61,33 @@ def init_db() -> None:
     
     # Создаем все таблицы
     Base.metadata.create_all(bind=engine)
+    # Лёгкая миграция для SQLite (create_all не добавляет новые колонки)
+    try:
+        if settings.DATABASE_URL.startswith("sqlite"):
+            import sqlite3
+
+            db_path = settings.DATABASE_URL.replace("sqlite:///", "")
+            con = sqlite3.connect(db_path)
+            try:
+                cur = con.cursor()
+                cols = [r[1] for r in cur.execute("PRAGMA table_info(vpn_sessions);").fetchall()]
+                if "mikrotik_session_id" not in cols:
+                    cur.execute("ALTER TABLE vpn_sessions ADD COLUMN mikrotik_session_id VARCHAR(64);")
+                    con.commit()
+                if "last_seen_at" not in cols:
+                    cur.execute("ALTER TABLE vpn_sessions ADD COLUMN last_seen_at DATETIME;")
+                    con.commit()
+
+                user_setting_cols = [r[1] for r in cur.execute("PRAGMA table_info(user_settings);").fetchall()]
+                if "require_confirmation" not in user_setting_cols:
+                    cur.execute("ALTER TABLE user_settings ADD COLUMN require_confirmation BOOLEAN NOT NULL DEFAULT 0;")
+                    con.commit()
+                if "session_duration_hours" not in user_setting_cols:
+                    cur.execute("ALTER TABLE user_settings ADD COLUMN session_duration_hours INTEGER NOT NULL DEFAULT 24;")
+                    con.commit()
+            finally:
+                con.close()
+    except Exception:
+        # не валим запуск; если не получилось — поле просто будет недоступно до ручной миграции
+        pass
     print(f"База данных инициализирована: {settings.DATABASE_URL}")

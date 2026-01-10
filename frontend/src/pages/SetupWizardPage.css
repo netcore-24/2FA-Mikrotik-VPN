@@ -1,0 +1,345 @@
+.setup-wizard-page {
+  min-height: 100vh;
+  background: var(--bg-color);
+  padding: 1.25rem;
+}
+
+.wizard-container {
+  max-width: 900px;
+  margin: 0 auto;
+  background: var(--card-bg);
+  border-radius: 1rem;
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+
+.wizard-header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 1.5rem;
+  text-align: center;
+}
+
+.wizard-header h2 {
+  margin: 0 0 1rem 0;
+  font-size: 1.75rem;
+}
+
+.wizard-progress {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.progress-bar {
+  flex: 1;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: white;
+  transition: width 0.3s ease;
+}
+
+.wizard-steps-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 1rem;
+  background: var(--bg-color);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.wizard-step-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.75rem;
+  border-radius: 0.5rem;
+  background: var(--card-bg);
+  border: 2px solid var(--border-color);
+  transition: all 0.2s;
+}
+
+.wizard-step-indicator.completed {
+  background: #d1fae5;
+  border-color: #10b981;
+  color: #065f46;
+}
+
+.wizard-step-indicator.active {
+  background: #dbeafe;
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+  font-weight: 600;
+}
+
+.step-number {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--border-color);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.wizard-step-indicator.completed .step-number {
+  background: #10b981;
+  color: white;
+}
+
+.wizard-step-indicator.active .step-number {
+  background: var(--primary-color);
+  color: white;
+}
+
+.step-name {
+  font-size: 0.85rem;
+}
+
+.wizard-content {
+  padding: 1.5rem;
+}
+
+.wizard-step-content h3 {
+  margin-top: 0;
+  margin-bottom: 1rem;
+  color: var(--text-primary);
+  font-size: 1.5rem;
+}
+
+.wizard-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.wizard-form .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.wizard-form label {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 0.9375rem;
+}
+
+.wizard-form input,
+.wizard-form select {
+  padding: 0.875rem 1rem;
+  border: 2px solid var(--border-color);
+  border-radius: var(--radius-md);
+  font-size: 1rem;
+  transition: all var(--transition);
+  background: var(--card-bg);
+  color: var(--text-primary);
+  font-family: inherit;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.wizard-form select {
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23333' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 1rem center;
+  padding-right: 2.5rem;
+}
+
+.wizard-form input:focus,
+.wizard-form select:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px var(--primary-light);
+}
+
+.wizard-form input:disabled {
+  background: var(--bg-color);
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.wizard-form small {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin-top: -0.25rem;
+}
+
+.wizard-help {
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+  border: 1px solid #bae6fd;
+  border-radius: var(--radius-md);
+  padding: 1rem;
+  margin-bottom: 1.25rem;
+  border-left: 4px solid var(--info-color);
+}
+
+.wizard-help p {
+  margin: 0.5rem 0;
+  line-height: 1.6;
+}
+
+.wizard-help ol,
+.wizard-help ul {
+  margin: 0.5rem 0 0 1.5rem;
+}
+
+.wizard-help code {
+  background: #e0e7ff;
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+  font-size: 0.875rem;
+}
+
+.wizard-help a {
+  color: var(--primary-color);
+  text-decoration: none;
+}
+
+.wizard-help a:hover {
+  text-decoration: underline;
+}
+
+.wizard-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 1rem 0;
+}
+
+.test-success {
+  padding: 0.75rem;
+  background: #d1fae5;
+  border: 1px solid #10b981;
+  border-radius: 0.375rem;
+  color: #065f46;
+}
+
+.test-error {
+  padding: 0.75rem;
+  background: #fee2e2;
+  border: 1px solid var(--danger-color);
+  border-radius: 0.375rem;
+  color: var(--danger-color);
+}
+
+.wizard-navigation {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 2px solid var(--border-color);
+}
+
+.wizard-navigation button {
+  flex: 1;
+  padding: 0.875rem 1.5rem;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition);
+  font-family: inherit;
+}
+
+.wizard-navigation .action-btn {
+  background: var(--bg-color);
+  color: var(--text-primary);
+  border: 2px solid var(--border-color);
+}
+
+.wizard-navigation .action-btn:hover:not(:disabled) {
+  background: var(--hover-bg);
+  border-color: var(--border-dark);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-sm);
+}
+
+.wizard-navigation .action-btn-success {
+  background: linear-gradient(135deg, var(--primary-color) 0%, #818cf8 100%);
+  color: white;
+  border: none;
+  box-shadow: var(--shadow-sm);
+}
+
+.wizard-navigation .action-btn-success:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  background: linear-gradient(135deg, var(--primary-hover) 0%, #6366f1 100%);
+}
+
+.wizard-navigation button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+.action-btn-secondary {
+  background: var(--bg-color);
+  color: var(--text-primary);
+  border: 2px solid var(--border-color);
+}
+
+.action-btn-secondary:hover:not(:disabled) {
+  background: var(--hover-bg);
+  border-color: var(--border-dark);
+}
+
+.review-summary {
+  background: var(--bg-color);
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+  margin: 1.5rem 0;
+}
+
+.review-summary h4 {
+  margin-top: 0;
+  color: var(--text-primary);
+}
+
+.review-summary ul {
+  list-style: none;
+  padding: 0;
+}
+
+.review-summary li {
+  padding: 0.5rem 0;
+  color: var(--text-secondary);
+}
+
+.wizard-completed {
+  text-align: center;
+  padding: 4rem 2rem;
+}
+
+.wizard-completed h2 {
+  color: var(--success-color);
+  margin-bottom: 1rem;
+}
+
+@media (max-width: 768px) {
+  .setup-wizard-page {
+    padding: 1rem;
+  }
+
+  .wizard-steps-list {
+    flex-direction: column;
+  }
+
+  .wizard-navigation {
+    flex-direction: column;
+  }
+}

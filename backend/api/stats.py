@@ -46,6 +46,7 @@ async def get_overview_stats_endpoint(
         active_sessions=stats["active_sessions"],
         total_registration_requests=stats["total_registration_requests"],
         pending_registration_requests=stats["pending_registration_requests"],
+        mikrotik_active_sessions=stats.get("mikrotik_active_sessions"),
     )
 
 

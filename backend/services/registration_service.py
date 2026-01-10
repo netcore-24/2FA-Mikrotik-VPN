@@ -42,6 +42,21 @@ def create_registration_request(
         if email:
             user.email = email
         db.commit()
+
+    # Если уже есть ожидающий запрос, не создаем дубликат
+    existing_pending = (
+        db.query(RegistrationRequest)
+        .filter(
+            and_(
+                RegistrationRequest.user_id == user.id,
+                RegistrationRequest.status == RegistrationRequestStatus.PENDING,
+            )
+        )
+        .order_by(RegistrationRequest.requested_at.desc())
+        .first()
+    )
+    if existing_pending:
+        return existing_pending
     
     # Создаем запрос на регистрацию
     registration_request = RegistrationRequest(

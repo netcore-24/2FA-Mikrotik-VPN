@@ -36,6 +36,10 @@ class User(Base, UUIDMixin, TimestampMixin):
     vpn_sessions = relationship("VPNSession", back_populates="user", cascade="all, delete-orphan")
     registration_requests = relationship("RegistrationRequest", back_populates="user", cascade="all, delete-orphan")
     user_settings = relationship("UserSetting", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    # Legacy: старое сопоставление (1:1). Оставлено для обратной совместимости.
+    mikrotik_mapping = relationship("UserMapping", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    # Новое: привязка до 2 MikroTik-аккаунтов на пользователя
+    mikrotik_accounts = relationship("UserMikrotikAccount", back_populates="user", cascade="all, delete-orphan")
     
     def __repr__(self):
         return f"<User(id={self.id}, telegram_id={self.telegram_id}, status={self.status})>"
