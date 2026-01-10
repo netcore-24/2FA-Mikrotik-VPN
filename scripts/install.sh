@@ -725,7 +725,6 @@ echo ""
 
 log_info "📚 Документация:"
 echo "   - Быстрый старт: $PROJECT_DIR/QUICK_START.md"
-echo "   - Статус развертывания: $PROJECT_DIR/DEPLOYMENT_STATUS.md"
 echo "   - Общая информация: $PROJECT_DIR/README.md"
 echo ""
 

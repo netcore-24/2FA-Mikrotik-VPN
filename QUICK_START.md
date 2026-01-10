@@ -219,8 +219,6 @@ fuser -k data/database.db
 
 - [INSTALL.md](INSTALL.md) - Подробная инструкция по установке
 - [README.md](README.md) - Общая информация о проекте
-- [DEPLOYMENT_STATUS.md](DEPLOYMENT_STATUS.md) - Статус развертывания
-- [ENHANCEMENTS.md](ENHANCEMENTS.md) - Дополнения и улучшения
 
 ---
 
