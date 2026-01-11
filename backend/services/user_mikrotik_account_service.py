@@ -25,7 +25,7 @@ def get_user_mikrotik_usernames(db: Session, user_id: str) -> List[str]:
 def set_user_mikrotik_usernames(db: Session, user_id: str, usernames: List[str]) -> List[str]:
     """
     Установить список MikroTik usernames для пользователя.
-    Ограничение: максимум 2.
+    Поддерживает привязку нескольких MikroTik-учёток к одному пользователю.
     """
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
@@ -40,9 +40,6 @@ def set_user_mikrotik_usernames(db: Session, user_id: str, usernames: List[str])
             continue
         if u not in cleaned:
             cleaned.append(u)
-
-    if len(cleaned) > 2:
-        raise ValueError("Можно привязать максимум 2 учетные записи MikroTik к одному пользователю Telegram")
 
     # Проверяем, что такие пользователи существуют на MikroTik (UM или PPP),
     # чтобы бот мог гарантированно включать/выключать нужную учётку.

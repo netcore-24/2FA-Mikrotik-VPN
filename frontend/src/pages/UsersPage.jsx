@@ -196,13 +196,13 @@ const UsersPage = () => {
 
   const handleEdit = (user) => {
     setEditingUser(user)
+    const existingUsernames = (user.mikrotik_usernames || []).map((v) => (v || '').toString())
     setEditForm({
       full_name: user.full_name || '',
       phone: user.phone || '',
       email: user.email || '',
       status: user.status,
-      mikrotik_username_1: user.mikrotik_usernames?.[0] || '',
-      mikrotik_username_2: user.mikrotik_usernames?.[1] || '',
+      mikrotik_usernames: existingUsernames.length > 0 ? existingUsernames : [''],
       require_confirmation: false,
       firewall_rule_comment: '',
       session_duration_hours: 24,
@@ -216,8 +216,8 @@ const UsersPage = () => {
         return
       }
 
-      const mikrotik_usernames = [editForm.mikrotik_username_1, editForm.mikrotik_username_2]
-        .map((v) => (v || '').trim())
+      const mikrotik_usernames = (editForm.mikrotik_usernames || [])
+        .map((v) => (v || '').toString().trim())
         .filter(Boolean)
       const email = (editForm.email || '').trim()
       await updateMutation.mutateAsync({
@@ -500,24 +500,54 @@ const UsersPage = () => {
           </div>
         </div>
         <div className="form-group">
-          <label>MikroTik аккаунт #1 (username)</label>
-          <input
-            type="text"
-            list="mikrotik-usernames"
-            value={editForm.mikrotik_username_1 || ''}
-            onChange={(e) => setEditForm({ ...editForm, mikrotik_username_1: e.target.value })}
-            placeholder="например: user_123456"
-          />
-        </div>
-        <div className="form-group">
-          <label>MikroTik аккаунт #2 (username)</label>
-          <input
-            type="text"
-            list="mikrotik-usernames"
-            value={editForm.mikrotik_username_2 || ''}
-            onChange={(e) => setEditForm({ ...editForm, mikrotik_username_2: e.target.value })}
-            placeholder="опционально (максимум 2 аккаунта)"
-          />
+          <label>MikroTik аккаунты (usernames)</label>
+          <div className="field-hint">
+            Можно привязать несколько MikroTik usernames к одному пользователю Telegram. Пустые значения будут проигнорированы.
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
+            {(editForm.mikrotik_usernames || ['']).map((val, idx) => (
+              <div key={idx} style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                <input
+                  type="text"
+                  list="mikrotik-usernames"
+                  value={val || ''}
+                  onChange={(e) => {
+                    const next = [...(editForm.mikrotik_usernames || [])]
+                    next[idx] = e.target.value
+                    setEditForm({ ...editForm, mikrotik_usernames: next })
+                  }}
+                  placeholder={idx === 0 ? 'например: user_123456' : 'опционально'}
+                  style={{ flex: 1 }}
+                />
+                <button
+                  type="button"
+                  className="action-btn action-btn-danger"
+                  onClick={() => {
+                    const next = [...(editForm.mikrotik_usernames || [])]
+                    next.splice(idx, 1)
+                    setEditForm({ ...editForm, mikrotik_usernames: next.length > 0 ? next : [''] })
+                  }}
+                  disabled={(editForm.mikrotik_usernames || []).length <= 1}
+                  title="Удалить"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+            <div>
+              <button
+                type="button"
+                className="action-btn"
+                onClick={() => {
+                  const next = [...(editForm.mikrotik_usernames || [])]
+                  next.push('')
+                  setEditForm({ ...editForm, mikrotik_usernames: next })
+                }}
+              >
+                + Добавить аккаунт
+              </button>
+            </div>
+          </div>
         </div>
         <datalist id="mikrotik-usernames">
           {(mikrotikUsers?.users || []).map((u, idx) => (

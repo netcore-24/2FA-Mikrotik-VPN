@@ -123,7 +123,7 @@ async def request_vpn_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
                 await message.reply_text(session_text, reply_markup=InlineKeyboardMarkup(keyboard))
             return
 
-        # Получаем привязанные MikroTik usernames (до 2)
+        # Получаем привязанные MikroTik usernames
         accounts = (
             db.query(UserMikrotikAccount)
             .filter(UserMikrotikAccount.user_id == db_user.id, UserMikrotikAccount.is_active == True)  # noqa: E712

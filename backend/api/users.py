@@ -179,8 +179,7 @@ async def update_user_data(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=t("user.not_found"),
         )
-    
-    # Обновляем привязки MikroTik (до 2), если пришли в запросе
+    # Обновляем привязки MikroTik (список usernames), если пришли в запросе
     if user_update.mikrotik_usernames is not None:
         try:
             set_user_mikrotik_usernames(db, user_id, user_update.mikrotik_usernames)

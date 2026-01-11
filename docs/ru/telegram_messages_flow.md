@@ -51,7 +51,7 @@ flowchart TD
   V_HAS -->|Кнопка Disconnect| MS_DISC_CB
   V1 -- Нет --> V2{Сколько привязанных MikroTik аккаунтов?\nuser_mikrotik_accounts (is_active)}
   V2 -- 0 --> V_NOACC["Сообщение (hardcoded):\n\"Администратор должен привязать ваш MikroTik аккаунт\""]
-  V2 -- 2 --> V_CHOOSE["Сообщение (hardcoded):\n\"У вас привязано 2 аккаунта… выберите\"\nКнопки: action:request_vpn:<username>"]
+  V2 -- 2+ --> V_CHOOSE["Сообщение (hardcoded):\n\"У вас привязано несколько аккаунтов… выберите\"\nКнопки: action:request_vpn:<username>"]
   V2 -- 1 --> V_GO
   V_CHOOSE --> V_GO["Сообщение (hardcoded):\n\"Активирую MikroTik аккаунт: <username>…\""]
   V_GO --> V_CREATE{create_vpn_session() успешно?\n(внутри enable_user_manager_user)}
