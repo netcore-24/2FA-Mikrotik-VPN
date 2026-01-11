@@ -96,58 +96,16 @@ mikrotik-2fa-vpn/
 
 ## Установка
 
-### Автоматическая установка (рекомендуется)
-
-Проект включает полностью автоматизированный установщик, который можно запустить даже на “чистой” системе.
+### Установка “в одну команду” (рекомендуется)
 
 ```bash
-# 1) Скачайте скрипт установки из GitHub
-wget -O install.sh "https://raw.githubusercontent.com/sh034/2FA-Mikrotik-VPN/main/install.sh"
-
-# 2) Запустите установку (скрипт сам поставит git, склонирует проект в /opt и поднимет сервис)
+wget -O install.sh "https://raw.githubusercontent.com/netcore-24/2FA-Mikrotik-VPN/main/install.sh"
 sudo bash install.sh
 ```
 
-Скрипт автоматически:
-- Проверяет системные зависимости
-- Устанавливает git (если отсутствует)
-- Клонирует репозиторий в `/opt/mikrotik-2fa-vpn`
-- Создает виртуальное окружение
-- Устанавливает все зависимости
-- Инициализирует базу данных
-- Создает systemd service
-- Настраивает права доступа
-- Запускает приложение и включает автозагрузку
+Скрипт сам установит зависимости, развернёт проект, запустит сервис и выведет в терминале **ссылку вида** `http://<IP>:8000` (веб уже будет готов).
 
-Подробная документация по установке: [INSTALL.md](INSTALL.md)
-
-### Ручная установка
-
-Проект содержит все необходимые зависимости и скрипт автоматической установки.
-
-### Быстрая установка
-
-```bash
-# Клонирование проекта
-git clone <repository-url> mikrotik-2fa-vpn
-cd mikrotik-2fa-vpn
-
-# Автоматическая установка
-chmod +x install.sh
-sudo ./install.sh
-
-# Настройка переменных окружения
-cp .env.example .env
-nano .env
-
-# Создание первого администратора
-./scripts/setup_admin.sh
-
-# Запуск приложения
-./scripts/start.sh
-```
-
-Подробное руководство по установке: `docs/deployment.md`
+Подробности: [INSTALL.md](INSTALL.md)
 
 ## Зависимости
 
@@ -190,12 +148,13 @@ nano .env
 1. **Прочитайте:** [SYSTEM_WORKFLOW.md](SYSTEM_WORKFLOW.md) - понять как работает система
 2. **Визуализация:** [docs/system_flow_diagram.md](docs/system_flow_diagram.md) - схемы процессов
 
-### Краткий старт
+### Быстрый старт
 
-```bash
-wget -O install.sh "https://raw.githubusercontent.com/sh034/2FA-Mikrotik-VPN/main/install.sh"
-sudo bash install.sh
-```
+См. [QUICK_START.md](QUICK_START.md)
+
+## Поддержать автора
+
+- DonationAlerts: [donationalerts.com/r/netcore_24](https://www.donationalerts.com/r/netcore_24)
 
 ## Лицензия
 

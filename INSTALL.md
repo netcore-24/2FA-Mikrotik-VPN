@@ -1,37 +1,30 @@
 # Руководство по установке
 
-## Вариант 0 (рекомендуется): установка “с нуля” через wget
+## Установка “с нуля” (рекомендуется)
 
 Подходит для новой системы, где проекта ещё нет на диске.
 
 ```bash
-wget -O install.sh "https://raw.githubusercontent.com/sh034/2FA-Mikrotik-VPN/main/install.sh"
+wget -O install.sh "https://raw.githubusercontent.com/netcore-24/2FA-Mikrotik-VPN/main/install.sh"
 sudo bash install.sh
 ```
 
 По умолчанию проект будет установлен в `/opt/mikrotik-2fa-vpn`, создан сервис `mikrotik-2fa-vpn.service` и приложение будет запущено.
 
-## Вариант 1: установка из git (вручную)
-
-```bash
-sudo GIT_REPO="https://github.com/sh034/2FA-Mikrotik-VPN.git" bash scripts/install.sh
-```
-
-## Вариант 2: установка из локальной директории
+## Если проект уже склонирован
 
 ```bash
 cd /path/to/mikrotik-2fa-vpn
-sudo bash scripts/install.sh
+sudo bash install.sh
 ```
 
 ## Параметры установки
-
-`scripts/install.sh` поддерживает переменные окружения:
+`install.sh` поддерживает переменные окружения:
 
 ```bash
 export INSTALL_DIR="/opt/mikrotik-2fa-vpn"
-export GIT_REPO="https://github.com/sh034/2FA-Mikrotik-VPN.git"
 export GIT_BRANCH="main"
+export REPO_URL="https://github.com/netcore-24/2FA-Mikrotik-VPN.git"
 export SYSTEM_USER="mikrotik-2fa"
 
 export CREATE_SYSTEMD_SERVICE="true"
@@ -63,6 +56,6 @@ sudo journalctl -u mikrotik-2fa-vpn.service -n 100 --no-pager
 ```bash
 sudo systemctl stop mikrotik-2fa-vpn || true
 sudo rm -rf /opt/mikrotik-2fa-vpn
-wget -O install.sh "https://raw.githubusercontent.com/sh034/2FA-Mikrotik-VPN/main/install.sh"
+wget -O install.sh "https://raw.githubusercontent.com/netcore-24/2FA-Mikrotik-VPN/main/install.sh"
 sudo bash install.sh
 ```
