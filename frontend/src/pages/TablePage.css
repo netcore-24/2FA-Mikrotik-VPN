@@ -36,6 +36,10 @@
   min-width: 720px;
 }
 
+.data-table-compact {
+  min-width: 0;
+}
+
 .data-table thead {
   background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
   border-bottom: 2px solid var(--border-color);
@@ -56,6 +60,23 @@
   border-bottom: 1px solid var(--border-light);
   color: var(--text-primary);
   font-size: 0.9375rem;
+}
+
+.data-table-compact th {
+  padding: 0.75rem 0.9rem;
+  font-size: 0.75rem;
+}
+
+.data-table-compact td {
+  padding: 0.75rem 0.9rem;
+  font-size: 0.9rem;
+}
+
+.row-actions-compact .action-btn {
+  padding: 0.5rem 0.9rem;
+  min-height: 34px;
+  font-size: 0.85rem;
+  min-width: auto;
 }
 
 .data-table tbody tr {
@@ -236,6 +257,140 @@
   flex-wrap: wrap;
 }
 
+.vpn-sessions-page .filters {
+  padding: 0.75rem;
+  gap: 0.5rem;
+}
+
+.vpn-sessions-page .id-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  width: fit-content;
+  max-width: 100%;
+  border: 1px dashed var(--border-color);
+  background: transparent;
+  color: var(--text-secondary);
+  border-radius: 9999px;
+  padding: 0.15rem 0.5rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
+    'Courier New', monospace;
+  font-size: 0.8rem;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.vpn-sessions-page .id-pill:hover {
+  border-color: var(--primary-color);
+  color: var(--text-primary);
+}
+
+.vpn-sessions-page .id-variant {
+  display: none;
+  white-space: nowrap;
+}
+
+/* default (desktop) */
+.vpn-sessions-page .id-variant.id-lg {
+  display: inline;
+}
+
+@media (max-width: 1024px) {
+  .vpn-sessions-page .id-variant {
+    display: none;
+  }
+  .vpn-sessions-page .id-variant.id-md {
+    display: inline;
+  }
+}
+
+@media (max-width: 768px) {
+  .vpn-sessions-page .id-variant {
+    display: none;
+  }
+  .vpn-sessions-page .id-variant.id-sm {
+    display: inline;
+  }
+}
+
+@media (max-width: 420px) {
+  .vpn-sessions-page .id-variant {
+    display: none;
+  }
+  .vpn-sessions-page .id-variant.id-xs {
+    display: inline;
+  }
+}
+
+.vpn-sessions-page .filter-select,
+.vpn-sessions-page .filter-input {
+  padding: 0.55rem 0.75rem;
+  min-width: 160px;
+  font-size: 0.9rem;
+}
+
+.vpn-sessions-page .page-header {
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+}
+
+.vpn-sessions-page .page-header h2 {
+  font-size: 1.5rem;
+}
+
+@media (max-width: 768px) {
+  /* Mobile-first: превращаем таблицу VPN сессий в карточки */
+  .vpn-sessions-page .data-table {
+    min-width: 0;
+  }
+
+  .vpn-sessions-page .data-table thead {
+    display: none;
+  }
+
+  .vpn-sessions-page .data-table,
+  .vpn-sessions-page .data-table tbody,
+  .vpn-sessions-page .data-table tr,
+  .vpn-sessions-page .data-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .vpn-sessions-page .data-table tr {
+    padding: 0.85rem;
+    border-bottom: 1px solid var(--border-light);
+  }
+
+  .vpn-sessions-page .data-table tr:last-child {
+    border-bottom: none;
+  }
+
+  .vpn-sessions-page .data-table td {
+    padding: 0.35rem 0;
+    border-bottom: none;
+  }
+
+  .vpn-sessions-page .data-table td::before {
+    content: attr(data-label);
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-secondary);
+    margin-bottom: 0.2rem;
+  }
+
+  .vpn-sessions-page .row-actions {
+    gap: 0.5rem;
+  }
+
+  .vpn-sessions-page .row-actions .action-btn {
+    min-width: 100%;
+    justify-content: center;
+  }
+}
+
 .filter-select,
 .filter-input {
   padding: 0.75rem 1rem;
@@ -261,6 +416,61 @@
   gap: 1rem;
   align-items: center;
   flex-wrap: wrap;
+}
+
+@media (max-width: 768px) {
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+  }
+
+  .page-header h2 {
+    font-size: 1.5rem;
+  }
+
+  .header-actions {
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+
+  .filters {
+    width: 100%;
+    padding: 0.75rem;
+    gap: 0.5rem;
+  }
+
+  .filter-select,
+  .filter-input {
+    width: 100%;
+    min-width: 0;
+    padding: 0.6rem 0.75rem;
+    font-size: 0.9rem;
+  }
+
+  .action-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  /* Таблица: убираем жесткий min-width, чтобы не ломать viewport */
+  .data-table {
+    min-width: 0;
+  }
+
+  .data-table th,
+  .data-table td {
+    padding: 0.75rem 0.9rem;
+  }
+
+  .pagination {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
 }
 
 .no-data {

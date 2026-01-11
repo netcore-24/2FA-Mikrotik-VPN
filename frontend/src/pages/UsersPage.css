@@ -1,0 +1,241 @@
+.users-page .page-header {
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.75rem;
+}
+
+.users-page .page-header h2 {
+  font-size: 1.5rem;
+}
+
+.users-page .filters {
+  gap: 0.5rem;
+  padding: 0.75rem;
+  margin-bottom: 0;
+}
+
+.users-page .filter-select,
+.users-page .filter-input {
+  min-width: 180px;
+  padding: 0.6rem 0.75rem;
+  font-size: 0.9rem;
+}
+
+.users-page .export-buttons {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.users-page .action-btn {
+  padding: 0.5rem 0.75rem;
+  min-height: 34px;
+  font-size: 0.85rem;
+}
+
+.users-page .row-actions {
+  gap: 0.5rem;
+}
+
+.users-page .users-actions-compact .action-btn {
+  min-width: auto;
+}
+
+.users-page .embedded-requests-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 0.75rem 0.5rem 0.75rem;
+}
+
+.users-page .embedded-requests-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.users-page .embedded-requests-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.users-page .embedded-requests-empty {
+  padding: 0.75rem;
+  opacity: 0.9;
+}
+
+.users-page .embedded-requests-table {
+  min-width: 0;
+}
+
+.users-page .embedded-requests-table th,
+.users-page .embedded-requests-table td {
+  padding: 0.65rem 0.85rem;
+}
+
+.users-page .data-table {
+  min-width: 860px;
+}
+
+.users-page .data-table th,
+.users-page .data-table td {
+  padding: 0.85rem 0.9rem;
+}
+
+.users-tag {
+  font-size: 0.78rem;
+  padding: 0.15rem 0.4rem;
+  border-radius: 999px;
+  display: inline-block;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  border: 1px solid rgba(33, 150, 243, 0.35);
+  background: rgba(33, 150, 243, 0.08);
+  color: #0b4a86;
+}
+
+.users-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.users-muted {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.users-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.9rem;
+}
+
+.users-table {
+  display: block;
+}
+
+.users-cards {
+  display: none;
+  padding: 0.75rem;
+  gap: 0.75rem;
+}
+
+.users-card {
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-lg);
+  background: var(--card-bg);
+  box-shadow: var(--shadow-sm);
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.users-card-top {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.users-card-title {
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+.users-card-meta {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.users-card-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem 0.75rem;
+}
+
+.users-card-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.users-card-label {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 700;
+}
+
+.users-card-value {
+  font-size: 0.95rem;
+  color: var(--text-primary);
+}
+
+.users-card-extra {
+  border-top: 1px dashed var(--border-light);
+  padding-top: 0.5rem;
+}
+
+.users-card-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 900px) {
+  .users-page .page-header {
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+
+  .users-page .header-actions {
+    width: 100%;
+  }
+
+  .users-page .filter-select,
+  .users-page .filter-input {
+    min-width: 160px;
+    flex: 1;
+  }
+}
+
+@media (max-width: 768px) {
+  .users-page .data-table {
+    min-width: 0;
+  }
+
+  .users-page .embedded-requests-header {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 0.75rem 0.75rem 0.25rem 0.75rem;
+  }
+
+  .users-page .embedded-requests-actions {
+    width: 100%;
+  }
+
+  .users-page .embedded-requests-actions .action-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .users-table {
+    display: none;
+  }
+
+  .users-cards {
+    display: grid;
+  }
+
+  .users-card-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .users-card-actions .action-btn {
+    flex: 1;
+    justify-content: center;
+  }
+}
+

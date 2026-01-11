@@ -4,6 +4,7 @@ import api from '../services/api'
 import Modal from '../components/Modal'
 import { exportTableToCSV, exportTableToExcel } from '../utils/export'
 import './TablePage.css'
+import './UsersPage.css'
 
 const getErrorMessage = (error) => {
   const data = error?.response?.data
@@ -269,7 +270,7 @@ const UsersPage = () => {
   }
 
   return (
-    <div className="table-page">
+    <div className="table-page users-page">
       <div className="page-header">
         <h2>Пользователи</h2>
         <div className="header-actions">
@@ -342,61 +343,110 @@ const UsersPage = () => {
       </div>
 
       {/* Заявки на регистрацию (встроено в Пользователи) */}
-      <div className="table-container" style={{ marginBottom: '1rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.75rem 0.25rem' }}>
-          <h3 style={{ margin: 0 }}>Заявки на регистрацию</h3>
-          <button className="action-btn" onClick={() => queryClient.invalidateQueries(['registration-requests'])}>
-            Обновить
-          </button>
+      <div className="table-container embedded-requests" style={{ marginBottom: '1rem' }}>
+        <div className="embedded-requests-header">
+          <h3 className="embedded-requests-title">Заявки на регистрацию</h3>
+          <div className="embedded-requests-actions">
+            <button
+              className="action-btn"
+              onClick={() => queryClient.invalidateQueries(['registration-requests'])}
+              title="Обновить список заявок"
+            >
+              Обновить
+            </button>
+          </div>
         </div>
         {pendingRequestsLoading ? (
           <div className="loading-container">
             <div className="loading">Загрузка заявок...</div>
           </div>
         ) : !pendingRequests?.items || pendingRequests.items.length === 0 ? (
-          <div className="no-data" style={{ padding: '0.75rem', opacity: 0.85 }}>
+          <div className="no-data embedded-requests-empty">
             Нет ожидающих заявок
           </div>
         ) : (
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Пользователь</th>
-                <th>Telegram ID</th>
-                <th>Дата</th>
-                <th>Действия</th>
-              </tr>
-            </thead>
-            <tbody>
+          <>
+            <div className="users-table">
+              <table className="data-table data-table-compact embedded-requests-table">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Пользователь</th>
+                    <th>Telegram ID</th>
+                    <th>Дата</th>
+                    <th>Действия</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pendingRequests.items.map((r) => (
+                    <tr key={r.id}>
+                      <td>{r.id.slice(0, 8)}...</td>
+                      <td>{r.user?.full_name || '-'}</td>
+                      <td>{r.user?.telegram_id || '-'}</td>
+                      <td>{r.requested_at ? new Date(r.requested_at).toLocaleString('ru-RU') : '-'}</td>
+                      <td>
+                        <div className="row-actions row-actions-compact">
+                          <button
+                            className="action-btn action-btn-success"
+                            onClick={() => handleApproveRequest(r.id)}
+                            disabled={approveRequestMutation.isPending}
+                          >
+                            Одобрить
+                          </button>
+                          <button
+                            className="action-btn action-btn-danger"
+                            onClick={() => handleRejectRequestClick(r.id)}
+                            disabled={rejectRequestMutation.isPending}
+                          >
+                            Отклонить
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="users-cards">
               {pendingRequests.items.map((r) => (
-                <tr key={r.id}>
-                  <td>{r.id.slice(0, 8)}...</td>
-                  <td>{r.user?.full_name || '-'}</td>
-                  <td>{r.user?.telegram_id || '-'}</td>
-                  <td>{r.requested_at ? new Date(r.requested_at).toLocaleString('ru-RU') : '-'}</td>
-                  <td>
-                    <div className="row-actions">
-                      <button
-                        className="action-btn action-btn-success"
-                        onClick={() => handleApproveRequest(r.id)}
-                        disabled={approveRequestMutation.isPending}
-                      >
-                        Одобрить
-                      </button>
-                      <button
-                        className="action-btn action-btn-danger"
-                        onClick={() => handleRejectRequestClick(r.id)}
-                        disabled={rejectRequestMutation.isPending}
-                      >
-                        Отклонить
-                      </button>
+                <div key={r.id} className="users-card">
+                  <div className="users-card-top">
+                    <div className="users-card-title">{r.user?.full_name || '—'}</div>
+                    <div className="users-card-meta">ID: {r.id.slice(0, 8)}…</div>
+                  </div>
+                  <div className="users-card-grid">
+                    <div className="users-card-field">
+                      <div className="users-card-label">Telegram</div>
+                      <div className="users-card-value">{r.user?.telegram_id || '—'}</div>
                     </div>
-                  </td>
-                </tr>
+                    <div className="users-card-field">
+                      <div className="users-card-label">Дата</div>
+                      <div className="users-card-value">
+                        {r.requested_at ? new Date(r.requested_at).toLocaleString('ru-RU') : '—'}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="users-card-actions">
+                    <button
+                      className="action-btn action-btn-success"
+                      onClick={() => handleApproveRequest(r.id)}
+                      disabled={approveRequestMutation.isPending}
+                    >
+                      Одобрить
+                    </button>
+                    <button
+                      className="action-btn action-btn-danger"
+                      onClick={() => handleRejectRequestClick(r.id)}
+                      disabled={rejectRequestMutation.isPending}
+                    >
+                      Отклонить
+                    </button>
+                  </div>
+                </div>
               ))}
-            </tbody>
-          </table>
+            </div>
+          </>
         )}
       </div>
 
@@ -611,110 +661,175 @@ const UsersPage = () => {
       </Modal>
 
       <div className="table-container">
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Telegram ID</th>
-              <th>Имя</th>
-              <th>MikroTik аккаунты</th>
-              <th>Доп. защита</th>
-              <th>Firewall (2FA)</th>
-              <th>Статус</th>
-              <th>Создан</th>
-              <th>Действия</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data?.items?.length === 0 ? (
+        <div className="users-table">
+          <table className="data-table">
+            <thead>
               <tr>
-                <td colSpan="7" className="no-data">
-                  Нет пользователей
-                </td>
+                <th>ID</th>
+                <th>Telegram ID</th>
+                <th>Имя</th>
+                <th>MikroTik аккаунты</th>
+                <th>Доп. защита</th>
+                <th>Firewall (2FA)</th>
+                <th>Статус</th>
+                <th>Создан</th>
+                <th>Действия</th>
               </tr>
-            ) : (
-              data?.items?.map((user) => (
-              <tr key={user.id}>
-                <td>{user.id.substring(0, 8)}...</td>
-                <td>{user.telegram_id || '-'}</td>
-                <td>{user.full_name || '-'}</td>
-                <td>
-                  {user.mikrotik_usernames && user.mikrotik_usernames.length > 0 ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-                      {user.mikrotik_usernames.map((username, idx) => (
-                        <span
-                          key={idx}
-                          style={{
-                            fontSize: '0.85rem',
-                            padding: '0.15rem 0.4rem',
-                            background: '#e3f2fd',
-                            border: '1px solid #2196f3',
-                            borderRadius: '3px',
-                            display: 'inline-block',
-                            fontFamily: 'monospace',
-                          }}
-                        >
-                          {username}
-                        </span>
-                      ))}
+            </thead>
+            <tbody>
+              {data?.items?.length === 0 ? (
+                <tr>
+                  <td colSpan="9" className="no-data">
+                    Нет пользователей
+                  </td>
+                </tr>
+              ) : (
+                data?.items?.map((user) => (
+                  <tr key={user.id}>
+                    <td>{user.id.substring(0, 8)}...</td>
+                    <td>{user.telegram_id || '-'}</td>
+                    <td>{user.full_name || '-'}</td>
+                    <td>
+                      {user.mikrotik_usernames && user.mikrotik_usernames.length > 0 ? (
+                        <div className="users-tags">
+                          {user.mikrotik_usernames.map((username, idx) => (
+                            <span key={idx} className="users-tag">
+                              {username}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="users-muted">Не привязаны</span>
+                      )}
+                    </td>
+                    <td>
+                      {user.require_confirmation ? (
+                        <span className="status-badge status-active">Вкл</span>
+                      ) : (
+                        <span className="status-badge status-rejected">Выкл</span>
+                      )}
+                    </td>
+                    <td className="users-mono">
+                      {user.firewall_rule_comment ? user.firewall_rule_comment : '-'}
+                    </td>
+                    <td>
+                      <span className={`status-badge status-${user.status}`}>
+                        {user.status === 'approved' && 'Одобрен'}
+                        {user.status === 'pending' && 'Ожидает'}
+                        {user.status === 'active' && 'Активен'}
+                        {user.status === 'inactive' && 'Неактивен'}
+                        {user.status === 'rejected' && 'Отклонен'}
+                        {!['approved', 'pending', 'active', 'inactive', 'rejected'].includes(user.status) && user.status}
+                      </span>
+                    </td>
+                    <td>{new Date(user.created_at).toLocaleDateString('ru-RU')}</td>
+                    <td>
+                      <div className="row-actions users-actions-compact">
+                        <button className="action-btn" onClick={() => handleEdit(user)}>
+                          Редактировать
+                        </button>
+                        {user.status !== 'active' && (
+                          <button
+                            className="action-btn action-btn-success"
+                            onClick={() => handleStatusChange(user.id, 'active')}
+                            disabled={changeStatusMutation.isPending}
+                          >
+                            Активировать
+                          </button>
+                        )}
+                        {user.status === 'active' && (
+                          <button
+                            className="action-btn action-btn-warning"
+                            onClick={() => handleStatusChange(user.id, 'inactive')}
+                            disabled={changeStatusMutation.isPending}
+                          >
+                            Деактивировать
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="users-cards">
+          {(data?.items || []).map((user) => {
+            const mtCount = user?.mikrotik_usernames?.length || 0
+            return (
+              <div key={user.id} className="users-card">
+                <div className="users-card-top">
+                  <div className="users-card-title">{user.full_name || '—'}</div>
+                  <div className="users-card-meta">TG: {user.telegram_id || '—'} • ID: {user.id.slice(0, 8)}…</div>
+                </div>
+                <div className="users-card-grid">
+                  <div className="users-card-field">
+                    <div className="users-card-label">Статус</div>
+                    <div className="users-card-value">
+                      <span className={`status-badge status-${user.status}`}>
+                        {user.status === 'approved' && 'Одобрен'}
+                        {user.status === 'pending' && 'Ожидает'}
+                        {user.status === 'active' && 'Активен'}
+                        {user.status === 'inactive' && 'Неактивен'}
+                        {user.status === 'rejected' && 'Отклонен'}
+                        {!['approved', 'pending', 'active', 'inactive', 'rejected'].includes(user.status) && user.status}
+                      </span>
                     </div>
-                  ) : (
-                    <span style={{ color: '#999', fontSize: '0.9rem' }}>
-                      Не привязаны
-                    </span>
-                  )}
-                </td>
-                <td>
-                  {user.require_confirmation ? (
-                    <span className="status-badge status-active">Вкл</span>
-                  ) : (
-                    <span className="status-badge status-rejected">Выкл</span>
-                  )}
-                </td>
-                <td style={{ fontFamily: 'monospace', fontSize: '0.9rem' }}>
-                  {user.firewall_rule_comment ? user.firewall_rule_comment : '-'}
-                </td>
-                <td>
-                  <span className={`status-badge status-${user.status}`}>
-                    {user.status === 'approved' && 'Одобрен'}
-                    {user.status === 'pending' && 'Ожидает'}
-                    {user.status === 'active' && 'Активен'}
-                    {user.status === 'inactive' && 'Неактивен'}
-                    {user.status === 'rejected' && 'Отклонен'}
-                    {!['approved', 'pending', 'active', 'inactive', 'rejected'].includes(user.status) && user.status}
-                  </span>
-                </td>
-                <td>{new Date(user.created_at).toLocaleDateString('ru-RU')}</td>
-                <td>
-                  <div className="row-actions">
-                    <button className="action-btn" onClick={() => handleEdit(user)}>
-                      Редактировать
-                    </button>
-                    {user.status !== 'active' && (
-                      <button
-                        className="action-btn action-btn-success"
-                        onClick={() => handleStatusChange(user.id, 'active')}
-                        disabled={changeStatusMutation.isPending}
-                      >
-                        Активировать
-                      </button>
-                    )}
-                    {user.status === 'active' && (
-                      <button
-                        className="action-btn action-btn-warning"
-                        onClick={() => handleStatusChange(user.id, 'inactive')}
-                        disabled={changeStatusMutation.isPending}
-                      >
-                        Деактивировать
-                      </button>
-                    )}
                   </div>
-                </td>
-              </tr>
-            ))
-            )}
-          </tbody>
-        </table>
+                  <div className="users-card-field">
+                    <div className="users-card-label">MikroTik</div>
+                    <div className="users-card-value">{mtCount ? `${mtCount} аккаунт(ов)` : 'не привязаны'}</div>
+                  </div>
+                  <div className="users-card-field">
+                    <div className="users-card-label">2FA</div>
+                    <div className="users-card-value">
+                      {user.require_confirmation ? (
+                        <span className="status-badge status-active">Вкл</span>
+                      ) : (
+                        <span className="status-badge status-rejected">Выкл</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="users-card-field">
+                    <div className="users-card-label">Создан</div>
+                    <div className="users-card-value">{new Date(user.created_at).toLocaleDateString('ru-RU')}</div>
+                  </div>
+                </div>
+                {user.firewall_rule_comment ? (
+                  <div className="users-card-extra">
+                    <div className="users-card-label">Firewall (2FA)</div>
+                    <div className="users-card-value users-mono">{user.firewall_rule_comment}</div>
+                  </div>
+                ) : null}
+                <div className="users-card-actions">
+                  <button className="action-btn" onClick={() => handleEdit(user)}>
+                    Редактировать
+                  </button>
+                  {user.status !== 'active' && (
+                    <button
+                      className="action-btn action-btn-success"
+                      onClick={() => handleStatusChange(user.id, 'active')}
+                      disabled={changeStatusMutation.isPending}
+                    >
+                      Активировать
+                    </button>
+                  )}
+                  {user.status === 'active' && (
+                    <button
+                      className="action-btn action-btn-warning"
+                      onClick={() => handleStatusChange(user.id, 'inactive')}
+                      disabled={changeStatusMutation.isPending}
+                    >
+                      Деактивировать
+                    </button>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
 
         <div className="pagination">
           <button

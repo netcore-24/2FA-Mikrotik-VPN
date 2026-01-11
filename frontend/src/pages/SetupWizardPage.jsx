@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import api from '../services/api'
@@ -31,6 +31,7 @@ const SetupWizardPage = () => {
   const [adminEmail, setAdminEmail] = useState('') // Сохраняем email из шага security
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const mikrotikPrefillDoneRef = useRef(false)
 
   // Получаем статус мастера настройки
   const { data: status, isLoading: statusLoading } = useQuery({
@@ -79,6 +80,17 @@ const SetupWizardPage = () => {
     },
   })
 
+  // Подтягиваем текущую MikroTik-конфигурацию, чтобы при возврате на шаг
+  // "MikroTik Router" форма показывала существующие настройки.
+  const { data: mikrotikConfigs } = useQuery({
+    queryKey: ['mikrotik', 'configs', 'for-setup-wizard'],
+    queryFn: async () => {
+      const response = await api.get('/mikrotik/configs')
+      return response.data
+    },
+    enabled: currentStep === 'mikrotik',
+  })
+
   // Мутация для завершения мастера
   const completeWizardMutation = useMutation({
     mutationFn: async () => {
@@ -117,6 +129,27 @@ const SetupWizardPage = () => {
       setCurrentStep('welcome')
     }
   }, [status, stepsData]) // Не включаем currentStep в зависимости, чтобы избежать циклов
+
+  useEffect(() => {
+    if (currentStep !== 'mikrotik') {
+      mikrotikPrefillDoneRef.current = false
+      return
+    }
+    if (mikrotikPrefillDoneRef.current) return
+    const active = (mikrotikConfigs?.items || []).find((c) => c?.is_active) || (mikrotikConfigs?.items || [])[0]
+    if (!active) return
+
+    mikrotikPrefillDoneRef.current = true
+    setStepData((prev) => ({
+      ...prev,
+      mikrotik_host: prev.mikrotik_host || active.host || '',
+      mikrotik_port: prev.mikrotik_port || active.port || (active.connection_type === 'api_ssl' ? 8729 : active.connection_type === 'api' ? 8728 : 22),
+      mikrotik_username: prev.mikrotik_username || active.username || '',
+      connection_type: prev.connection_type || active.connection_type || 'ssh_password',
+      // Пароль из backend не читаем (не отдаётся). Если оставить пустым — тест/сохранение смогут использовать сохранённый пароль на backend.
+      mikrotik_password: prev.mikrotik_password || '',
+    }))
+  }, [currentStep, mikrotikConfigs])
 
   const handleStepComplete = async (stepId) => {
     try {
@@ -440,7 +473,7 @@ const SetupWizardPage = () => {
                   value={stepData.connection_type || 'ssh_password'}
                   onChange={(e) => {
                     const connType = e.target.value
-                    const defaultPort = connType === 'rest_api' ? 8728 : 22
+                    const defaultPort = connType === 'api' ? 8728 : connType === 'api_ssl' ? 8729 : 22
                     setStepData({ 
                       ...stepData, 
                       connection_type: connType,
@@ -452,7 +485,8 @@ const SetupWizardPage = () => {
                 >
                   <option value="ssh_password">SSH (пароль) - порт 22</option>
                   <option value="ssh_key">SSH (ключ) - порт 22</option>
-                  <option value="rest_api">REST API - порт 8728</option>
+                  <option value="api">RouterOS API - порт 8728</option>
+                  <option value="api_ssl">RouterOS API SSL - порт 8729</option>
                 </select>
                 <small>Выберите способ подключения к MikroTik роутеру</small>
               </div>
@@ -461,15 +495,30 @@ const SetupWizardPage = () => {
                 <input
                   id="mikrotik_port"
                   type="number"
-                  value={stepData.mikrotik_port || (stepData.connection_type === 'rest_api' ? 8728 : 22) || 22}
+                  value={
+                    stepData.mikrotik_port ||
+                    (stepData.connection_type === 'api' ? 8728 : stepData.connection_type === 'api_ssl' ? 8729 : 22) ||
+                    22
+                  }
                   onChange={(e) => {
                     const port = parseInt(e.target.value)
-                    setStepData({ ...stepData, mikrotik_port: port || (stepData.connection_type === 'rest_api' ? 8728 : 22) })
+                    setStepData({
+                      ...stepData,
+                      mikrotik_port:
+                        port ||
+                        (stepData.connection_type === 'api'
+                          ? 8728
+                          : stepData.connection_type === 'api_ssl'
+                            ? 8729
+                            : 22),
+                    })
                   }}
-                  placeholder={stepData.connection_type === 'rest_api' ? '8728' : '22'}
+                  placeholder={stepData.connection_type === 'api' ? '8728' : stepData.connection_type === 'api_ssl' ? '8729' : '22'}
                   required
                 />
-                <small>Порт по умолчанию: <strong>22</strong> для SSH, <strong>8728</strong> для REST API</small>
+                <small>
+                  Порт по умолчанию: <strong>22</strong> для SSH, <strong>8728</strong> для API, <strong>8729</strong> для API SSL
+                </small>
               </div>
               <div className="form-group">
                 <label htmlFor="mikrotik_username">Имя пользователя *</label>
@@ -491,7 +540,9 @@ const SetupWizardPage = () => {
                   onChange={(e) => setStepData({ ...stepData, mikrotik_password: e.target.value })}
                   placeholder="Пароль администратора MikroTik"
                 />
-                <small>Обязателен для SSH (пароль) и REST API</small>
+                <small>
+                  Обязателен для SSH (пароль) и RouterOS API. Если пароль уже сохранён — можно оставить пустым (будет использован сохранённый).
+                </small>
               </div>
             </div>
             <div className="wizard-actions">
@@ -507,7 +558,7 @@ const SetupWizardPage = () => {
                     try {
                       // Тестируем подключение с временными данными из формы
                       const connType = stepData.connection_type || 'ssh_password'
-                      const defaultPort = connType === 'rest_api' ? 8728 : 22
+                      const defaultPort = connType === 'api' ? 8728 : connType === 'api_ssl' ? 8729 : 22
                       const testData = {
                         host: stepData.mikrotik_host,
                         port: stepData.mikrotik_port || defaultPort,

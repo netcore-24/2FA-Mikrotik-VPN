@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import api from '../services/api'
 import Modal from '../components/Modal'
@@ -10,6 +10,8 @@ const VPNSessionsPage = () => {
   const [statusFilter, setStatusFilter] = useState('')
   const [extendingSession, setExtendingSession] = useState(null)
   const [extendHours, setExtendHours] = useState('24')
+  const [autoRefresh, setAutoRefresh] = useState(true)
+  const [refreshMs, setRefreshMs] = useState(2000)
   const limit = 20
   const queryClient = useQueryClient()
 
@@ -29,6 +31,9 @@ const VPNSessionsPage = () => {
       const response = await api.get('/vpn-sessions', { params })
       return response.data
     },
+    refetchInterval: autoRefresh ? refreshMs : false,
+    refetchIntervalInBackground: true,
+    refetchOnWindowFocus: true,
   })
 
   const disconnectMutation = useMutation({
@@ -102,6 +107,22 @@ const VPNSessionsPage = () => {
     return { label: 'Нет', badge: 'status-rejected', ts: lastSeen }
   }
 
+  const formatAgo = (dt) => {
+    if (!dt) return ''
+    const t = dt instanceof Date ? dt : new Date(dt)
+    if (Number.isNaN(t.getTime())) return ''
+    const s = Math.max(0, Math.round((Date.now() - t.getTime()) / 1000))
+    if (s < 60) return `${s}s`
+    const m = Math.round(s / 60)
+    if (m < 60) return `${m}m`
+    const h = Math.round(m / 60)
+    if (h < 48) return `${h}h`
+    const d = Math.round(h / 24)
+    return `${d}d`
+  }
+
+  const refreshOptions = useMemo(() => [1000, 2000, 3000, 5000, 10000], [])
+
   if (isLoading) {
     return (
       <div className="loading-container">
@@ -126,7 +147,7 @@ const VPNSessionsPage = () => {
   }
 
   return (
-    <div className="table-page">
+    <div className="table-page vpn-sessions-page">
       <div className="page-header">
         <h2>VPN Сессии</h2>
         <div className="header-actions">
@@ -145,6 +166,28 @@ const VPNSessionsPage = () => {
             <option value="confirmed">Подтвержденные</option>
             <option value="disconnected">Отключенные</option>
             <option value="expired">Истекшие</option>
+          </select>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            <input
+              type="checkbox"
+              checked={autoRefresh}
+              onChange={(e) => setAutoRefresh(e.target.checked)}
+            />
+            Авто‑обновление
+          </label>
+          <select
+            className="filter-select"
+            value={String(refreshMs)}
+            onChange={(e) => setRefreshMs(parseInt(e.target.value, 10) || 2000)}
+            disabled={!autoRefresh}
+            style={{ minWidth: 120 }}
+            title="Интервал авто‑обновления"
+          >
+            {refreshOptions.map((ms) => (
+              <option key={ms} value={String(ms)}>
+                {ms >= 1000 ? `${ms / 1000}s` : `${ms}ms`}
+              </option>
+            ))}
           </select>
           <button
             className="action-btn"
@@ -197,65 +240,95 @@ const VPNSessionsPage = () => {
       </div>
 
       <div className="table-container">
-        <table className="data-table">
+        <table className="data-table data-table-compact">
           <thead>
             <tr>
-              <th>ID</th>
               <th>Пользователь</th>
               <th>MikroTik Username</th>
-              <th>Сессия на MikroTik</th>
               <th>Статус</th>
-              <th>Создана</th>
-              <th>Истекает</th>
+              <th>MikroTik (факт)</th>
+              <th>Время</th>
               <th>Действия</th>
             </tr>
           </thead>
           <tbody>
             {data?.items?.length === 0 ? (
               <tr>
-                <td colSpan="7" className="no-data">
+                <td colSpan="5" className="no-data">
                   Нет VPN сессий
                 </td>
               </tr>
             ) : (
               data?.items?.map((session) => (
                 <tr key={session.id}>
-                  <td>{session.id.substring(0, 8)}...</td>
-                  <td>
-                    {session.user?.full_name || session.user?.telegram_id || '-'}
+                  <td data-label="Пользователь">
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                      <div>
+                        <b>{session.user?.full_name || session.user?.telegram_id || '-'}</b>
+                      </div>
+                      <button
+                        type="button"
+                        className="id-pill"
+                        title={session.id}
+                        onClick={async () => {
+                          try {
+                            await navigator.clipboard?.writeText(session.id)
+                          } catch (e) {
+                            // fallback: nothing (still visible in tooltip)
+                          }
+                        }}
+                      >
+                        <span className="id-variant id-xs">
+                          {session.id.slice(0, 6)}…
+                        </span>
+                        <span className="id-variant id-sm">
+                          {session.id.slice(0, 8)}…
+                        </span>
+                        <span className="id-variant id-md">
+                          {session.id.slice(0, 10)}…
+                        </span>
+                        <span className="id-variant id-lg">
+                          {session.id.slice(0, 12)}…{session.id.slice(-4)}
+                        </span>
+                      </button>
+                    </div>
                   </td>
-                  <td>{session.mikrotik_username || '-'}</td>
-                  <td>
+                  <td data-label="MikroTik username">{session.mikrotik_username || '-'}</td>
+                  <td data-label="Статус">
+                    <span className={`status-badge status-${session.status}`}>
+                      {getStatusLabel(session.status)}
+                    </span>
+                  </td>
+                  <td data-label="MikroTik (факт)">
                     {(() => {
                       const ms = getMikrotikStatus(session)
                       return (
-                        <div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
                           <span className={`status-badge ${ms.badge}`}>{ms.label}</span>
                           {ms.ts && (
-                            <div style={{ fontSize: '0.85rem', opacity: 0.8, marginTop: '0.15rem' }}>
-                              last seen: {ms.ts.toLocaleString('ru-RU')}
+                            <div style={{ fontSize: '0.85rem', opacity: 0.75 }}>
+                              {formatAgo(ms.ts)} назад
                             </div>
                           )}
                         </div>
                       )
                     })()}
                   </td>
-                  <td>
-                    <span className={`status-badge status-${session.status}`}>
-                      {getStatusLabel(session.status)}
-                    </span>
+                  <td data-label="Время">
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem' }}>
+                      <div style={{ fontSize: '0.9rem' }}>
+                        <span style={{ opacity: 0.8 }}>созд:</span>{' '}
+                        {new Date(session.created_at).toLocaleString('ru-RU')}
+                      </div>
+                      <div style={{ fontSize: '0.9rem' }}>
+                        <span style={{ opacity: 0.8 }}>до:</span>{' '}
+                        {session.expires_at ? new Date(session.expires_at).toLocaleString('ru-RU') : '—'}
+                      </div>
+                    </div>
                   </td>
-                  <td>
-                    {new Date(session.created_at).toLocaleString('ru-RU')}
-                  </td>
-                  <td>
-                    {session.expires_at
-                      ? new Date(session.expires_at).toLocaleString('ru-RU')
-                      : '-'}
-                  </td>
-                  <td>
+                  <td data-label="Действия">
                     {['active', 'connected', 'confirmed'].includes(session.status) && (
-                      <>
+                      <div className="row-actions row-actions-compact">
                         <button
                           className="action-btn action-btn-warning"
                           onClick={() => handleExtendClick(session.id)}
@@ -270,7 +343,7 @@ const VPNSessionsPage = () => {
                         >
                           {disconnectMutation.isPending ? 'Отключение...' : 'Отключить'}
                         </button>
-                      </>
+                      </div>
                     )}
                   </td>
                 </tr>
