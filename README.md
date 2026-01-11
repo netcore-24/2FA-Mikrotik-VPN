@@ -1,5 +1,9 @@
 # MikroTik 2FA VPN System
 
+[Русский](#русский) | [English](#english)
+
+## Русский
+
 Система двухфакторной аутентификации для VPN подключений на роутерах MikroTik.
 
 ## Описание
@@ -75,7 +79,7 @@ mikrotik-2fa-vpn/
 
 **⚠️ ВАЖНО:** Система работает только с **СУЩЕСТВУЮЩИМИ** пользователями MikroTik! Она не создает новых, только управляет (enable/disable) теми, что созданы администратором вручную.
 
-**📖 Подробное описание:** см. [SYSTEM_WORKFLOW.md](SYSTEM_WORKFLOW.md)
+**📖 Подробное описание / Full workflow:** [RU](docs/ru/SYSTEM_WORKFLOW.md) | [EN](docs/en/SYSTEM_WORKFLOW.md)
 
 ## Технологии
 
@@ -105,7 +109,24 @@ sudo bash install.sh
 
 Скрипт сам установит зависимости, развернёт проект, запустит сервис и выведет в терминале **ссылку вида** `http://<IP>:8000` (веб уже будет готов).
 
-Подробности: [INSTALL.md](INSTALL.md)
+**Логин/пароль администратора (после установки):**
+- Во время установки они выводятся в терминал.
+- Также могут быть сохранены в файл (по умолчанию): `/opt/mikrotik-2fa-vpn/.admin_credentials.txt`  
+  (если вы меняли `INSTALL_DIR`, путь будет `<INSTALL_DIR>/.admin_credentials.txt`)
+
+Показать сохранённые данные:
+
+```bash
+sudo cat /opt/mikrotik-2fa-vpn/.admin_credentials.txt
+```
+
+После того как сохранили логин/пароль — удалите файл:
+
+```bash
+sudo rm -f /opt/mikrotik-2fa-vpn/.admin_credentials.txt
+```
+
+Подробности / Details: [RU](docs/ru/INSTALL.md) | [EN](docs/en/INSTALL.md)
 
 ## Зависимости
 
@@ -118,18 +139,19 @@ sudo bash install.sh
 
 ### 📖 Основная документация
 
-- **[SYSTEM_WORKFLOW.md](SYSTEM_WORKFLOW.md)** - 🔥 **Как работает система (ОБЯЗАТЕЛЬНО К ПРОЧТЕНИЮ)**
-- **[docs/system_flow_diagram.md](docs/system_flow_diagram.md)** - 📊 Визуальные диаграммы процессов
+- **Как работает система / Workflow**: [RU](docs/ru/SYSTEM_WORKFLOW.md) | [EN](docs/en/SYSTEM_WORKFLOW.md)
+- **Диаграммы / Diagrams**: [RU](docs/ru/system_flow_diagram.md) | [EN](docs/en/system_flow_diagram.md)
+- **Telegram сообщения / Telegram messages**: [RU](docs/ru/telegram_messages_flow.md) | [EN](docs/en/telegram_messages_flow.md)
 
 ### 📚 Техническая документация
 
-- Руководство по развертыванию: `docs/deployment.md`
-- Требования к системе: `docs/requirements.md`
-- Архитектура системы: `docs/architecture.md`
-- Справочник настроек: `docs/settings_reference.md`
-- Мастер настройки: `docs/setup_wizard.md`
-- Управление базой данных: `docs/database_management.md`
-- Интернационализация: `docs/i18n.md`
+- **Развертывание / Deployment**: [RU](docs/ru/deployment.md) | [EN](docs/en/deployment.md)
+- **Требования / Requirements**: [RU](docs/ru/requirements.md) | [EN](docs/en/requirements.md)
+- **Архитектура / Architecture**: [RU](docs/ru/architecture.md) | [EN](docs/en/architecture.md)
+- **Справочник настроек / Settings reference**: [RU](docs/ru/settings_reference.md) | [EN](docs/en/settings_reference.md)
+- **Мастер настройки / Setup wizard**: [RU](docs/ru/setup_wizard.md) | [EN](docs/en/setup_wizard.md)
+- **База данных / Database management**: [RU](docs/ru/database_management.md) | [EN](docs/en/database_management.md)
+- **i18n**: [RU](docs/ru/i18n.md) | [EN](docs/en/i18n.md)
 
 ## Языки интерфейса
 
@@ -139,7 +161,7 @@ sudo bash install.sh
 
 Язык определяется автоматически из параметра запроса `?lang=`, заголовка HTTP `Accept-Language` или настройки по умолчанию.
 
-Подробнее: см. `docs/i18n.md`
+Подробнее / Details: [RU](docs/ru/i18n.md) | [EN](docs/en/i18n.md)
 
 ## 🆘 Быстрая помощь
 
@@ -147,10 +169,12 @@ sudo bash install.sh
 
 1. **Прочитайте:** [SYSTEM_WORKFLOW.md](SYSTEM_WORKFLOW.md) - понять как работает система
 2. **Визуализация:** [docs/system_flow_diagram.md](docs/system_flow_diagram.md) - схемы процессов
+ 
+RU/EN: [Workflow RU](docs/ru/SYSTEM_WORKFLOW.md) · [Workflow EN](docs/en/SYSTEM_WORKFLOW.md) · [Diagrams RU](docs/ru/system_flow_diagram.md) · [Diagrams EN](docs/en/system_flow_diagram.md)
 
 ### Быстрый старт
 
-См. [QUICK_START.md](QUICK_START.md)
+См. [RU](docs/ru/QUICK_START.md) | [EN](docs/en/QUICK_START.md)
 
 ## Поддержать автора
 
@@ -159,3 +183,51 @@ sudo bash install.sh
 ## Лицензия
 
 Этот проект распространяется под лицензией **PolyForm Noncommercial 1.0.0** (только некоммерческое/ознакомительное использование). См. файл [LICENSE](LICENSE) для деталей. Коммерческое использование — по отдельной лицензии у автора: см. [COMMERCIAL_LICENSE.md](COMMERCIAL_LICENSE.md).
+
+---
+
+## English
+
+Two-factor authentication system for VPN access on MikroTik routers.
+
+## Installation
+
+### One-command install (recommended)
+
+```bash
+wget -O install.sh "https://raw.githubusercontent.com/netcore-24/2FA-Mikrotik-VPN/main/install.sh"
+sudo bash install.sh
+```
+
+The installer will set up dependencies, deploy the project, start the service, and print a URL like `http://<IP>:8000`.
+
+**Admin login/password (after install):**
+- Printed to the terminal during installation.
+- May also be saved to a file (default): `/opt/mikrotik-2fa-vpn/.admin_credentials.txt`  
+  (if you changed `INSTALL_DIR`, the path is `<INSTALL_DIR>/.admin_credentials.txt`)
+
+Show saved credentials:
+
+```bash
+sudo cat /opt/mikrotik-2fa-vpn/.admin_credentials.txt
+```
+
+After you store them somewhere safe, remove the file:
+
+```bash
+sudo rm -f /opt/mikrotik-2fa-vpn/.admin_credentials.txt
+```
+
+## Support the author
+
+- DonationAlerts: [donationalerts.com/r/netcore_24](https://www.donationalerts.com/r/netcore_24)
+
+## License
+
+This project is licensed under **PolyForm Noncommercial 1.0.0** (noncommercial/evaluation use only). See [LICENSE](LICENSE). Commercial use requires a separate license from the author — see [COMMERCIAL_LICENSE.md](COMMERCIAL_LICENSE.md).
+
+## Documentation
+
+- Workflow: [RU](docs/ru/SYSTEM_WORKFLOW.md) | [EN](docs/en/SYSTEM_WORKFLOW.md)
+- Install: [RU](docs/ru/INSTALL.md) | [EN](docs/en/INSTALL.md)
+- Quick start: [RU](docs/ru/QUICK_START.md) | [EN](docs/en/QUICK_START.md)
