@@ -8,6 +8,7 @@ Type=simple
 User=mikrotik-2fa
 WorkingDirectory=/opt/mikrotik-2fa-vpn
 Environment="PATH=/opt/mikrotik-2fa-vpn/venv/bin"
+Environment="PYTHONUNBUFFERED=1"
 EnvironmentFile=/opt/mikrotik-2fa-vpn/.env
 ExecStart=/opt/mikrotik-2fa-vpn/venv/bin/uvicorn backend.main:app --host 0.0.0.0 --port 8000
 Restart=always
@@ -23,7 +24,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/opt/mikrotik-2fa-vpn/data /opt/mikrotik-2fa-vpn/logs
+ReadWritePaths=/opt/mikrotik-2fa-vpn/data /opt/mikrotik-2fa-vpn/logs /opt/mikrotik-2fa-vpn/.env /opt/mikrotik-2fa-vpn/backups /opt/mikrotik-2fa-vpn/data/backups
 
 [Install]
 WantedBy=multi-user.target

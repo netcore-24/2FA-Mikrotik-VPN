@@ -1,38 +1,36 @@
-#!/bin/bash
-# Скрипт для остановки всех сервисов проекта
+#!/usr/bin/env bash
 
-echo "🛑 Остановка MikroTik 2FA VPN System..."
+# Совместимая остановка backend. Рекомендуемый способ — через systemd:
+#   sudo systemctl stop mikrotik-2fa-vpn
 
-# Останавливаем backend
-if [ -f /tmp/mikrotik-backend.pid ]; then
-    PID=$(cat /tmp/mikrotik-backend.pid)
-    if kill -0 $PID 2>/dev/null; then
-        kill $PID
-        echo "✅ Backend остановлен (PID: $PID)"
-        rm /tmp/mikrotik-backend.pid
-    else
-        echo "⚠️  Backend не запущен (PID файл найден, но процесс не существует)"
-        rm /tmp/mikrotik-backend.pid
-    fi
-else
-    # Пробуем найти процесс по имени
-    PID=$(pgrep -f "uvicorn backend.main:app" | head -1)
-    if [ -n "$PID" ]; then
-        kill $PID
-        echo "✅ Backend остановлен (PID: $PID)"
-    else
-        echo "ℹ️  Backend не запущен"
-    fi
+set -euo pipefail
+
+echo "Остановка MikroTik 2FA VPN System..."
+
+if command -v systemctl >/dev/null 2>&1 && systemctl list-unit-files 2>/dev/null | grep -q '^mikrotik-2fa-vpn\.service'; then
+  if [[ "${EUID}" -ne 0 ]]; then
+    sudo systemctl stop mikrotik-2fa-vpn || true
+  else
+    systemctl stop mikrotik-2fa-vpn || true
+  fi
+  echo "OK: сервис остановлен (systemd)"
+  exit 0
 fi
 
-# Останавливаем Telegram бот
-PID=$(pgrep -f "telegram_bot.bot" | head -1)
-if [ -n "$PID" ]; then
-    kill $PID
-    echo "✅ Telegram бот остановлен (PID: $PID)"
-else
-    echo "ℹ️  Telegram бот не запущен"
+if [[ -f /tmp/mikrotik-2fa-vpn.pid ]]; then
+  PID="$(cat /tmp/mikrotik-2fa-vpn.pid || true)"
+  if [[ -n "${PID}" ]] && kill -0 "${PID}" 2>/dev/null; then
+    kill "${PID}" || true
+    rm -f /tmp/mikrotik-2fa-vpn.pid || true
+    echo "OK: backend остановлен (PID: ${PID})"
+    exit 0
+  fi
 fi
 
-echo ""
-echo "✅ Все сервисы остановлены!"
+PID="$(pgrep -f "uvicorn backend.main:app" 2>/dev/null | head -n1 || true)"
+if [[ -n "${PID}" ]]; then
+  kill "${PID}" || true
+  echo "OK: backend остановлен (PID: ${PID})"
+else
+  echo "OK: backend не запущен"
+fi
