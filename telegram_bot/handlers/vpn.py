@@ -74,7 +74,7 @@ async def request_vpn_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
         if update.callback_query:
             await update.callback_query.answer()
 
-        # Проверяем регистрацию
+        # Проверка регистрации
         if not check_user_registered(db, user_id):
             await message.reply_text(
                 translate("bot.errors.not_registered", user_id),
@@ -82,7 +82,7 @@ async def request_vpn_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
             )
             return
         
-        # Получаем пользователя
+        # Получение пользователя
         db_user = get_user_from_db(db, user_id)
         if not db_user:
             await message.reply_text(
@@ -91,7 +91,7 @@ async def request_vpn_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
             )
             return
         
-        # Проверяем статус пользователя
+        # Проверка статуса пользователя
         if db_user.status.value not in ["approved", "active"]:
             await message.reply_text(
                 translate("bot.vpn.request.user_not_approved", user_id),
@@ -99,7 +99,7 @@ async def request_vpn_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
             )
             return
         
-        # Если есть активные сессии — показываем и выходим
+        # Если есть активные сессии — показать и завершить обработку
         active_sessions = get_user_active_sessions(db, db_user.id)
         if active_sessions:
             await message.reply_text(
@@ -123,7 +123,7 @@ async def request_vpn_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
                 await message.reply_text(session_text, reply_markup=InlineKeyboardMarkup(keyboard))
             return
 
-        # Получаем привязанные MikroTik usernames
+        # Получение привязанных MikroTik usernames
         accounts = (
             db.query(UserMikrotikAccount)
             .filter(UserMikrotikAccount.user_id == db_user.id, UserMikrotikAccount.is_active == True)  # noqa: E712
@@ -179,7 +179,7 @@ async def request_vpn_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
                 )
                 return
 
-        # Создаем VPN сессию сразу (без причины) — create_vpn_session включает пользователя в MikroTik
+        # Создание VPN-сессии без указания причины (create_vpn_session включает пользователя в MikroTik)
         try:
             vpn_session = create_vpn_session(
                 db=db,
@@ -204,7 +204,7 @@ async def request_vpn_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
                 f"✅ MikroTik аккаунт активирован: `{chosen_username}`\n"
                 f"ID запроса: `{vpn_session.id[:8]}`\n\n"
                 "Теперь подключайтесь к VPN обычным способом.\n"
-                "Мы обнаружим подключение и (если включена доп. защита) запросим подтверждение."
+                "Система обнаружит подключение и (если включена доп. защита) запросит подтверждение."
             ),
             parse_mode="Markdown",
             reply_markup=build_main_menu_keyboard(user_id, is_registered=True),
@@ -228,7 +228,7 @@ async def my_sessions_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
         if update.callback_query:
             await update.callback_query.answer()
 
-        # Проверяем регистрацию
+        # Проверка регистрации
         if not check_user_registered(db, user_id):
             await message.reply_text(
                 translate("bot.errors.not_registered", user_id),
@@ -236,7 +236,7 @@ async def my_sessions_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
             )
             return
         
-        # Получаем пользователя
+        # Получение пользователя
         db_user = get_user_from_db(db, user_id)
         if not db_user:
             await message.reply_text(
@@ -245,7 +245,7 @@ async def my_sessions_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
             )
             return
         
-        # Получаем активные сессии
+        # Получение активных сессий
         active_sessions = get_user_active_sessions(db, db_user.id)
         
         if not active_sessions:

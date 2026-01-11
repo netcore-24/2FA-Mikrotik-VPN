@@ -30,7 +30,7 @@ cd "$PROJECT_ROOT"
 
 log_info "Обновление MikroTik 2FA VPN System..."
 
-# Проверяем наличие виртуального окружения
+# Проверка наличия виртуального окружения
 if [ ! -d "venv" ]; then
     log_error "Виртуальное окружение не найдено. Запустите сначала install.sh"
     exit 1
@@ -39,7 +39,7 @@ fi
 # Активируем виртуальное окружение
 source venv/bin/activate
 
-# Создаем резервную копию базы данных перед обновлением
+# Создание резервной копии базы данных перед обновлением
 log_info "Создание резервной копии базы данных перед обновлением..."
 if [ -f "scripts/backup_db.sh" ]; then
     bash scripts/backup_db.sh
@@ -47,7 +47,7 @@ else
     log_warn "Скрипт backup_db.sh не найден, резервная копия не создана"
 fi
 
-# Обновляем зависимости Python
+# Обновление Python зависимостей
 log_info "Обновление Python зависимостей..."
 pip install --upgrade pip
 if [ -f "requirements.txt" ]; then
@@ -56,7 +56,7 @@ else
     log_warn "Файл requirements.txt не найден"
 fi
 
-# Обновляем Frontend зависимости (если требуется)
+# Обновление Frontend зависимостей (если требуется)
 if [ -d "frontend" ] && [ -f "frontend/package.json" ]; then
     log_info "Обновление Frontend зависимостей..."
     if command -v npm &> /dev/null; then
@@ -69,7 +69,7 @@ if [ -d "frontend" ] && [ -f "frontend/package.json" ]; then
     fi
 fi
 
-# Выполняем миграции базы данных (если необходимо)
+# Миграции базы данных (если необходимо)
 log_info "Проверка миграций базы данных..."
 # Миграции выполняются автоматически при запуске приложения
 

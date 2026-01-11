@@ -32,7 +32,7 @@ class VPNSession(Base, UUIDMixin, TimestampMixin):
     confirmed_at = Column(DateTime, nullable=True)
     expires_at = Column(DateTime, nullable=True)
     reminder_sent_at = Column(DateTime, nullable=True)
-    # Последний момент, когда мы видели активную сессию на MikroTik для этого username.
+    # Последний момент, когда была видна активная сессия на MikroTik для этого username.
     # Нужен для защиты от ложных "disconnected" при кратковременных сбоях связи/учёта.
     last_seen_at = Column(DateTime, nullable=True)
     

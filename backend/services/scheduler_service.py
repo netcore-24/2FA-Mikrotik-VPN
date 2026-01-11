@@ -162,7 +162,7 @@ class SchedulerService:
 
                 active = []
                 for s in candidate:
-                    # если мы в "режиме активных" — пропускаем неактивные
+                    # в "режиме активных" — пропуск неактивных
                     if active_candidates and not (bool(s.get("active")) is True):
                         continue
                     u = s.get("user") or s.get("username") or s.get("name")
