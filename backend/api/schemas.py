@@ -367,6 +367,23 @@ class MikroTikUserCreate(BaseModel):
     profile: Optional[str] = None
 
 
+# Сессии MikroTik (User Manager / PPP active)
+class MikroTikSessionResponse(BaseModel):
+    """Нормализованная сессия MikroTik (UM session или PPP active)."""
+    mikrotik_session_id: Optional[str] = None
+    user: Optional[str] = None
+    active: Optional[bool] = None
+    source: Optional[str] = None  # user_manager_session | ppp_active | ...
+    number: Optional[int] = None
+    data: Optional[dict[str, Any]] = None
+
+
+class MikroTikSessionListResponse(BaseModel):
+    """Список сессий MikroTik."""
+    sessions: list[MikroTikSessionResponse]
+    total: int
+
+
 # Схемы для аудита
 class AuditLogResponse(BaseModel):
     """Схема ответа с записью журнала аудита."""

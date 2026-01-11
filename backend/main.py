@@ -148,7 +148,7 @@ def create_app() -> FastAPI:
                     ("vpn_require_confirmation", False, "vpn", "Требовать подтверждение 'Это вы подключились?' перед включением firewall"),
                     ("vpn_confirmation_timeout_seconds", 300, "vpn", "Таймаут ожидания подтверждения (сек)"),
                     # Важно: влияет на задержку появления 2FA-запроса после фактического подключения.
-                    ("vpn_connection_check_interval_seconds", 10, "vpn", "Интервал проверки активных подключений (сек)"),
+                    ("vpn_connection_check_interval_seconds", 3, "vpn", "Интервал проверки активных подключений (сек)"),
                 ]
                 for key, value, category, desc in defaults:
                     if not get_setting_by_key(db, key):

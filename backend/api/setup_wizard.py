@@ -25,6 +25,9 @@ from backend.services.setup_wizard_service import (
 )
 from backend.services.mikrotik_config_service import test_mikrotik_config_connection
 from backend.services.mikrotik_config_service import get_active_mikrotik_config
+from backend.services.mikrotik_config_service import get_mikrotik_config_with_decrypted_password
+from backend.models.mikrotik_config import ConnectionType
+from backend.services.mikrotik_service import test_mikrotik_connection
 from backend.models.admin import Admin
 
 router = APIRouter(prefix="/setup-wizard", tags=["setup-wizard"])
@@ -238,79 +241,64 @@ async def test_mikrotik_connection_endpoint(
     if body and ("host" in body or "mikrotik_host" in body):
         # Тестируем с временными параметрами из формы мастера настройки
         host = body.get("host") or body.get("mikrotik_host")
-        port = body.get("port") or body.get("mikrotik_port", 22)
+        port = body.get("port") or body.get("mikrotik_port")
         username = body.get("username") or body.get("mikrotik_username")
-        password = body.get("password") or body.get("mikrotik_password") or ""
+        password = body.get("password") or body.get("mikrotik_password")
         connection_type = body.get("connection_type", "ssh_password")
+
+        # Нормализация типов (на случай старых значений в UI/БД)
+        # Раньше в проекте встречался тип "rest_api"; в текущей версии это RouterOS API ("api"/"api_ssl").
+        if connection_type == "rest_api":
+            connection_type = "api"
+
+        # Если пароль не передали — попробуем использовать сохранённый активный пароль (если есть).
+        # Это важно при возврате на шаг, т.к. backend не отдаёт пароль обратно в UI.
+        if (password is None or str(password).strip() == ""):
+            active = get_active_mikrotik_config(db)
+            if active:
+                cfg = get_mikrotik_config_with_decrypted_password(db, active.id)
+                if cfg and cfg.get("password"):
+                    password = cfg.get("password")
+
+        # Если порт не передали — берём дефолт по типу подключения
+        if port is None:
+            port = 8729 if connection_type == "api_ssl" else 8728 if connection_type == "api" else 22
+        else:
+            port = int(port)
         
         if not host or not username:
             return SetupWizardTestResponse(
                 success=False,
                 message="Необходимо указать хост и имя пользователя",
             )
-        
-        # Тестируем подключение напрямую
+
+        # Тестируем подключение через общий сервис (SSH с fallback на keyboard-interactive, RouterOS API, ключи)
         try:
-            # Нормализуем тип подключения
-            if connection_type in ["api", "rest_api"]:
-                import requests
-                from requests.auth import HTTPDigestAuth
-                from requests.packages.urllib3.exceptions import InsecureRequestWarning
-                import urllib3
-                urllib3.disable_warnings(InsecureRequestWarning)
-                
-                url = f"http://{host}:{port}/rest/system/identity"
-                response = requests.get(
-                    url, 
-                    auth=HTTPDigestAuth(username, password), 
-                    timeout=10, 
-                    verify=False
-                )
-                success = response.status_code == 200
-                error_message = None if success else f"HTTP {response.status_code}: {response.text[:200]}"
-            else:
-                # SSH подключение
-                import paramiko
-                ssh = paramiko.SSHClient()
-                ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-                try:
-                    ssh.connect(
-                        hostname=host, 
-                        port=int(port), 
-                        username=username, 
-                        password=password, 
-                        timeout=10,
-                        look_for_keys=False,
-                        allow_agent=False
-                    )
-                    ssh.close()
-                    success = True
-                    error_message = None
-                except paramiko.AuthenticationException:
-                    success = False
-                    error_message = "Ошибка аутентификации. Проверьте имя пользователя и пароль."
-                except paramiko.SSHException as e:
-                    success = False
-                    error_message = f"Ошибка SSH подключения: {str(e)}"
-                except Exception as e:
-                    success = False
-                    error_message = f"Ошибка подключения: {str(e)}"
-            
-            if success:
-                return SetupWizardTestResponse(
-                    success=True,
-                    message=t("mikrotik.config.test_success") or "Подключение к MikroTik успешно!",
-                )
-            else:
-                return SetupWizardTestResponse(
-                    success=False,
-                    message=error_message or t("mikrotik.config.test_failed") or "Не удалось подключиться к MikroTik",
-                )
-        except Exception as e:
+            # connection_type уже нормализован выше, пробуем привести к enum
+            connection_type_enum = ConnectionType(str(connection_type).strip())
+        except Exception:
+            # fallback на самый безопасный вариант
+            connection_type_enum = ConnectionType.SSH_PASSWORD
+
+        ssh_key_path = body.get("ssh_key_path") or body.get("mikrotik_ssh_key_path")
+        success, error_message = test_mikrotik_connection(
+            host=str(host).strip(),
+            port=int(port),
+            username=str(username).strip(),
+            password=(password if password is not None else None),
+            ssh_key_path=(str(ssh_key_path).strip() if ssh_key_path else None),
+            connection_type=connection_type_enum,
+        )
+
+        if success:
             return SetupWizardTestResponse(
-                success=False,
-                message=f"Ошибка подключения: {str(e)}",
+                success=True,
+                message=t("mikrotik.config.test_success") or "Подключение к MikroTik успешно!",
             )
+        return SetupWizardTestResponse(
+            success=False,
+            message=error_message or t("mikrotik.config.test_failed") or "Не удалось подключиться к MikroTik",
+        )
     
     # Стандартная логика - тестирование сохраненной конфигурации
     if not config_id:

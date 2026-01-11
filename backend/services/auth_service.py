@@ -3,6 +3,8 @@
 """
 from datetime import datetime, timedelta
 from typing import Optional
+import base64
+import hashlib
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from sqlalchemy.orm import Session
@@ -13,14 +15,32 @@ from backend.models.admin import Admin
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
+def _normalize_password_for_bcrypt(password: str) -> str:
+    """
+    bcrypt учитывает только первые 72 байта пароля (в UTF-8) и некоторые реализации
+    выбрасывают исключение на >72 bytes.
+
+    Чтобы не обрезать пароль вручную и не терять энтропию, делаем pre-hash (SHA-256)
+    только для "длинных" паролей.
+    """
+    if password is None:
+        return ""
+    b = password.encode("utf-8")
+    if len(b) <= 72:
+        return password
+    digest = hashlib.sha256(b).digest()
+    # ASCII-строка фиксированной длины, пригодная для bcrypt
+    return "sha256$" + base64.urlsafe_b64encode(digest).decode("ascii")
+
+
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Проверка пароля."""
-    return pwd_context.verify(plain_password, hashed_password)
+    return pwd_context.verify(_normalize_password_for_bcrypt(plain_password), hashed_password)
 
 
 def get_password_hash(password: str) -> str:
     """Хеширование пароля."""
-    return pwd_context.hash(password)
+    return pwd_context.hash(_normalize_password_for_bcrypt(password))
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:

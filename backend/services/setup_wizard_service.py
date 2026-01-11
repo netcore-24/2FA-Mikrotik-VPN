@@ -12,6 +12,7 @@ from backend.services.mikrotik_config_service import create_mikrotik_config
 from backend.services.mikrotik_service import test_mikrotik_connection
 from backend.models.mikrotik_config import ConnectionType
 from config.settings import settings as app_settings
+from backend.services.settings_service import encrypt_value
 
 
 # Шаги мастера настройки
@@ -299,8 +300,10 @@ def complete_setup_wizard_step(
             # Получаем тип подключения и нормализуем его
             connection_type_str = data.get("connection_type", "ssh_password")
             # Преобразуем возможные варианты в корректные значения enum
-            if connection_type_str == "api" or connection_type_str == "rest_api":
-                connection_type_str = "rest_api"
+            if connection_type_str in {"api", "routeros_api"}:
+                connection_type_str = "api"
+            elif connection_type_str in {"api_ssl", "api-ssl", "routeros_api_ssl"}:
+                connection_type_str = "api_ssl"
             elif connection_type_str == "ssh_key":
                 connection_type_str = "ssh_key"
             else:
@@ -309,9 +312,11 @@ def complete_setup_wizard_step(
             connection_type = ConnectionType(connection_type_str)
             
             # Определяем порт по умолчанию в зависимости от типа подключения
-            # RouterOS REST API работает на веб-порту (обычно 443 для https, либо 80 для http).
-            # 8728/8729 — это RouterOS API, но он здесь не используется.
-            default_port = 443 if connection_type == ConnectionType.REST_API else 22
+            default_port = 22
+            if connection_type == ConnectionType.API:
+                default_port = 8728
+            elif connection_type == ConnectionType.API_SSL:
+                default_port = 8729
             port = data.get("mikrotik_port")
             if not port:
                 port = default_port
@@ -339,9 +344,17 @@ def complete_setup_wizard_step(
                 existing_config.host = data["mikrotik_host"]
                 existing_config.port = port
                 existing_config.username = data["mikrotik_username"]
+                # Важно: НЕ затираем пароль пустой строкой (UI может отправлять "" при возврате на шаг).
+                # Если пароль реально передан — шифруем перед сохранением.
                 if "mikrotik_password" in data:
-                    existing_config.password = data["mikrotik_password"]
+                    pw = data.get("mikrotik_password")
+                    if isinstance(pw, str):
+                        pw = pw.rstrip("\r\n")
+                    if pw:
+                        existing_config.password = encrypt_value(str(pw))
                 existing_config.connection_type = connection_type
+                if "mikrotik_ssh_key_path" in data:
+                    existing_config.ssh_key_path = data.get("mikrotik_ssh_key_path")
                 db.commit()
             
             # Сохраняем основные настройки MikroTik в БД (для синхронизации с .env)
@@ -351,8 +364,16 @@ def complete_setup_wizard_step(
                 set_setting(db, "mikrotik_port", str(port), category="mikrotik")
             if "mikrotik_username" in data:
                 set_setting(db, "mikrotik_username", data["mikrotik_username"], category="mikrotik")
+            # Важно: не затираем сохраненный пароль пустым значением.
+            # Если пароль не ввели — оставляем старый в БД/настройках.
             if "mikrotik_password" in data:
-                set_setting(db, "mikrotik_password", data["mikrotik_password"], category="mikrotik", is_encrypted=True)
+                pw_setting = data.get("mikrotik_password")
+                if isinstance(pw_setting, str):
+                    pw_setting = pw_setting.rstrip("\r\n")
+                if pw_setting:
+                    set_setting(db, "mikrotik_password", pw_setting, category="mikrotik", is_encrypted=True)
+
+            set_setting(db, "mikrotik_connection_type", connection_type.value, category="mikrotik")
             
             # Сохраняем дополнительные настройки
             if "mikrotik_user_prefix" in data:

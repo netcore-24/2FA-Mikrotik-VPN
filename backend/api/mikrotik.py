@@ -20,6 +20,8 @@ from backend.api.schemas import (
     MikroTikFirewallRuleResponse,
     MikroTikFirewallRuleBinding,
     MikroTikFirewallRuleAssignRequest,
+    MikroTikSessionListResponse,
+    MikroTikSessionResponse,
 )
 from backend.services.mikrotik_config_service import (
     get_mikrotik_config_by_id,
@@ -40,6 +42,10 @@ from backend.services.mikrotik_service import (
     disable_firewall_rule,
     find_firewall_rule_by_comment,
     get_user_manager_users,
+    get_user_manager_sessions,
+    enable_user_manager_user,
+    disable_user_manager_user,
+    terminate_active_sessions_for_username,
 )
 from backend.services.user_service import update_user_settings, get_user_settings
 from backend.models.user_setting import UserSetting
@@ -299,9 +305,16 @@ async def list_mikrotik_users(
         user_responses = []
         for user in users:
             name = user.get("name") or user.get("username") or user.get("user") or ""
+            # RouterOS User Manager часто использует ключ actual-profile вместо profile
+            profile = (
+                user.get("profile")
+                or user.get("actual-profile")
+                or user.get("actual_profile")
+                or user.get("group")
+            )
             user_responses.append(MikroTikUserResponse(
                 name=name,
-                profile=user.get("profile"),
+                profile=profile,
                 disabled=user.get("disabled"),
                 number=user.get("number"),
                 data=user,
@@ -593,6 +606,109 @@ async def get_user_manager_users_endpoint(
     try:
         result = get_user_manager_users(db)
         return result
+    except MikroTikConnectionError as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(e) or t("mikrotik.connection.failed"),
+        )
+
+
+# ========== Сессии / операции над пользователями ==========
+
+@router.get("/sessions", response_model=MikroTikSessionListResponse)
+async def list_mikrotik_sessions(
+    request: Request,
+    db: Session = Depends(get_db),
+    current_admin: Admin = Depends(get_current_admin),
+    t=Depends(get_translate),
+):
+    """
+    Получить подключения с MikroTik (User Manager sessions + PPP active).
+    Полезно для отладки: "видит ли система факт подключения".
+    """
+    try:
+        sessions = get_user_manager_sessions(db) or []
+        items: list[MikroTikSessionResponse] = []
+        for s in sessions:
+            if not isinstance(s, dict):
+                continue
+            items.append(
+                MikroTikSessionResponse(
+                    mikrotik_session_id=(
+                        s.get("mikrotik_session_id")
+                        or s.get("acct-session-id")
+                        or s.get("session-id")
+                        or s.get(".id")
+                        or s.get("id")
+                    ),
+                    user=s.get("user") or s.get("name") or s.get("username"),
+                    active=s.get("active"),
+                    source=s.get("source"),
+                    number=s.get("number"),
+                    data=s,
+                )
+            )
+        return MikroTikSessionListResponse(sessions=items, total=len(items))
+    except MikroTikConnectionError as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(e) or t("mikrotik.connection.failed"),
+        )
+
+
+@router.post("/users/{username}/enable", response_model=dict)
+async def enable_mikrotik_user_endpoint(
+    username: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_admin: Admin = Depends(get_current_admin),
+    t=Depends(get_translate),
+):
+    """Включить пользователя на MikroTik (disabled=no)."""
+    try:
+        enable_user_manager_user(db, username)
+        return {"message": "OK", "username": username, "disabled": False}
+    except MikroTikConnectionError as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(e) or t("mikrotik.connection.failed"),
+        )
+
+
+@router.post("/users/{username}/disable", response_model=dict)
+async def disable_mikrotik_user_endpoint(
+    username: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_admin: Admin = Depends(get_current_admin),
+    t=Depends(get_translate),
+):
+    """Отключить пользователя на MikroTik (disabled=yes)."""
+    try:
+        disable_user_manager_user(db, username)
+        return {"message": "OK", "username": username, "disabled": True}
+    except MikroTikConnectionError as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(e) or t("mikrotik.connection.failed"),
+        )
+
+
+@router.post("/users/{username}/disconnect", response_model=dict)
+async def disconnect_mikrotik_user_sessions_endpoint(
+    username: str,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_admin: Admin = Depends(get_current_admin),
+    t=Depends(get_translate),
+):
+    """
+    Best-effort: принудительно завершить активные сессии пользователя на MikroTik.
+    Не меняет disabled-флаг пользователя.
+    """
+    try:
+        terminate_active_sessions_for_username(db, username)
+        return {"message": "OK", "username": username}
     except MikroTikConnectionError as e:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,

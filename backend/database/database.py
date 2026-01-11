@@ -85,6 +85,19 @@ def init_db() -> None:
                 if "session_duration_hours" not in user_setting_cols:
                     cur.execute("ALTER TABLE user_settings ADD COLUMN session_duration_hours INTEGER NOT NULL DEFAULT 24;")
                     con.commit()
+
+                try:
+                    mt_cols = [r[1] for r in cur.execute("PRAGMA table_info(mikrotik_configs);").fetchall()]
+                    if "connection_type" in mt_cols:
+                        # Нормализация/миграция типов подключения к общим значениям (.value):
+                        # ssh_password / ssh_key / api / api_ssl
+                        cur.execute("UPDATE mikrotik_configs SET connection_type='ssh_password' WHERE connection_type IN ('SSH_PASSWORD','ssh_password');")
+                        cur.execute("UPDATE mikrotik_configs SET connection_type='ssh_key' WHERE connection_type IN ('SSH_KEY','ssh_key');")
+                        cur.execute("UPDATE mikrotik_configs SET connection_type='api' WHERE connection_type IN ('API','api','rest_api','routeros_api');")
+                        cur.execute("UPDATE mikrotik_configs SET connection_type='api_ssl' WHERE connection_type IN ('API_SSL','api_ssl','api-ssl','routeros_api_ssl');")
+                        con.commit()
+                except Exception:
+                    pass
             finally:
                 con.close()
     except Exception:

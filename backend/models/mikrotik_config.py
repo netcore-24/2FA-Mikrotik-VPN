@@ -11,7 +11,9 @@ class ConnectionType(str, enum.Enum):
     """Типы подключения к MikroTik."""
     SSH_PASSWORD = "ssh_password"
     SSH_KEY = "ssh_key"
-    REST_API = "rest_api"
+    # RouterOS API (8728 / 8729)
+    API = "api"
+    API_SSL = "api_ssl"
 
 
 class MikroTikConfig(Base, UUIDMixin, TimestampMixin):
@@ -24,7 +26,18 @@ class MikroTikConfig(Base, UUIDMixin, TimestampMixin):
     username = Column(String(100), nullable=False)
     password = Column(String(255), nullable=True)  # Зашифрован
     ssh_key_path = Column(String(500), nullable=True)
-    connection_type = Column(SQLEnum(ConnectionType), default=ConnectionType.SSH_PASSWORD, nullable=False)
+    # Важно: храним именно .value ('ssh_password'/'api'...), а не имя enum ('SSH_PASSWORD'/'API'...),
+    # чтобы совместить UI/настройки и данные БД.
+    connection_type = Column(
+        SQLEnum(
+            ConnectionType,
+            values_callable=lambda enum_cls: [e.value for e in enum_cls],
+            native_enum=False,
+            name="connectiontype",
+        ),
+        default=ConnectionType.SSH_PASSWORD,
+        nullable=False,
+    )
     is_active = Column(Boolean, default=True, nullable=False)
     
     last_connection_test = Column(DateTime, nullable=True)

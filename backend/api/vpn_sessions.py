@@ -1,7 +1,7 @@
 """
 API endpoints для управления VPN сессиями.
 """
-from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Query, Body
 from sqlalchemy.orm import Session
 from typing import Optional
 from datetime import datetime, timezone
@@ -293,8 +293,9 @@ async def create_vpn_session_endpoint(
 @router.post("/{session_id}/disconnect", response_model=VPNSessionResponse)
 async def disconnect_vpn_session_endpoint(
     session_id: str,
-    disconnect_data: VPNSessionDisconnect,
     request: Request,
+    # В UI запрос отправляется без body, поэтому делаем его необязательным
+    disconnect_data: VPNSessionDisconnect | None = Body(None),
     db: Session = Depends(get_db),
     current_admin: Admin = Depends(get_current_admin),
     t=Depends(get_translate),

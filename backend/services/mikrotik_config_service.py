@@ -5,7 +5,22 @@ from typing import Optional, List
 from datetime import datetime
 from sqlalchemy.orm import Session
 from backend.models.mikrotik_config import MikroTikConfig, ConnectionType
-from backend.services.settings_service import encrypt_value, decrypt_value
+from backend.services.settings_service import encrypt_value, decrypt_value, set_setting
+
+
+def _sync_active_mikrotik_connection_type_setting(db: Session, config: MikroTikConfig) -> None:
+    """
+    Синхронизировать тип подключения активного MikroTik-конфига в таблицу настроек.
+
+    Это нужно, чтобы в UI -> "Настройки" было видно, чем реально подключаемся (ssh/api).
+    """
+    try:
+        if not config or not getattr(config, "is_active", False):
+            return
+        set_setting(db, "mikrotik_connection_type", config.connection_type.value, category="mikrotik")
+    except Exception:
+        # не блокируем создание/обновление конфига из-за настроек
+        pass
 
 
 def get_mikrotik_config_by_id(db: Session, config_id: str) -> Optional[MikroTikConfig]:
@@ -57,6 +72,7 @@ def create_mikrotik_config(
     db.add(config)
     db.commit()
     db.refresh(config)
+    _sync_active_mikrotik_connection_type_setting(db, config)
     return config
 
 
@@ -101,6 +117,7 @@ def update_mikrotik_config(
     
     db.commit()
     db.refresh(config)
+    _sync_active_mikrotik_connection_type_setting(db, config)
     return config
 
 

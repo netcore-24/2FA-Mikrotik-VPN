@@ -148,23 +148,20 @@ class SchedulerService:
             # Получаем список активных подключений из MikroTik
             try:
                 sessions = get_user_manager_sessions(db)
-                # Считаем подключение по активным сессиям из:
-                # - User Manager session (флаг A / поле active)
-                # - PPP active (это “факт подключения”)
+                # Отслеживаем подключения через User Manager (активные = active=true / флаг A).
                 active_candidates = [
                     s
                     for s in (sessions or [])
-                    if (s.get("source") in {"user_manager_session", "ppp_active"})
-                    and (bool(s.get("active")) is True)
+                    if (s.get("source") in {"user_manager_session"})
+                    and (s.get("active") is True)
                 ]
-                # если по какой-то причине source/active не пришли — fallback на прежнюю эвристику
-                candidate = active_candidates if active_candidates else (sessions or [])
+                # Важно: считаем активными ТОЛЬКО UM-сессии с явным active=True (флаг A).
+                # PPP active здесь не используем как "факт 2FA-подключения", иначе появляются ложные срабатывания.
+                candidate = active_candidates
 
                 active = []
                 for s in candidate:
-                    # в "режиме активных" — пропуск неактивных
-                    if active_candidates and not (bool(s.get("active")) is True):
-                        continue
+                    # candidate уже содержит только активные UM-сессии
                     u = s.get("user") or s.get("username") or s.get("name")
                     if not u:
                         continue
@@ -190,36 +187,8 @@ class SchedulerService:
             disconnect_grace_seconds = max(30, interval_seconds * 2)
             
             # Проверяем каждую сессию
-            # (Дополнительно: если MikroTik сообщает активную UM-сессию, а у нас последняя сессия
-            # помечена DISCONNECTED — это часто признак ложного отключения. В таком случае
-            # "воскрешаем" последнюю сессию для username, чтобы UI отражал реальность.)
-            try:
-                from sqlalchemy import desc
-                for u in list(active_usernames):
-                    # есть ли уже отслеживаемая сессия в connected_sessions?
-                    if any(s.mikrotik_username == u for s in connected_sessions):
-                        continue
-                    latest = (
-                        db.query(VPNSession)
-                        .filter(VPNSession.mikrotik_username == u)
-                        .order_by(desc(VPNSession.created_at))
-                        .first()
-                    )
-                    if not latest:
-                        continue
-                    # воскрешаем только относительно свежие сессии (24 часа)
-                    if latest.created_at and (datetime.utcnow() - latest.created_at).total_seconds() > 86400:
-                        continue
-                    if latest.status == VPNSessionStatus.DISCONNECTED:
-                        latest.status = VPNSessionStatus.CONNECTED
-                        if not latest.connected_at:
-                            latest.connected_at = datetime.utcnow()
-                        latest.mikrotik_session_id = active_session_id_by_username.get(u) or latest.mikrotik_session_id
-                        latest.last_seen_at = datetime.utcnow()
-                        db.commit()
-                        connected_sessions.append(latest)
-            except Exception:
-                db.rollback()
+            # Важно: НЕ "воскрешаем" DISCONNECTED сессии даже если на MikroTik ещё видна активность.
+            # Правило системы: активна ТОЛЬКО UM-сессия с флагом A, а отключение из UI/бота должно быть финальным.
 
             for session in connected_sessions:
                 mikrotik_username = session.mikrotik_username

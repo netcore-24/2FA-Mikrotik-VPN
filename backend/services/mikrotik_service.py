@@ -1,10 +1,10 @@
 """
-Сервис для взаимодействия с MikroTik роутером через SSH и REST API.
+Сервис для взаимодействия с MikroTik роутером через SSH и RouterOS API.
 """
 import paramiko
-import requests
 import json
 import re
+import ssl
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 from sqlalchemy.orm import Session
@@ -168,81 +168,60 @@ class MikroTikSSHClient:
             self.client = None
 
 
-class MikroTikRESTClient:
-    """Клиент для работы с MikroTik через REST API."""
-    
-    def __init__(
-        self,
-        host: str,
-        port: int,
-        username: str,
-        password: str,
-        use_https: bool = False,
-    ):
+class MikroTikAPIClient:
+    """Клиент для работы с MikroTik через RouterOS API (8728/8729)."""
+
+    def __init__(self, host: str, port: int, username: str, password: str, use_ssl: bool = False):
         self.host = host
-        self.port = port
+        self.port = int(port)
         self.username = username
         self.password = password
-        self.protocol = "https" if use_https else "http"
-        # RouterOS REST живёт на веб-порту (обычно 80/443, либо кастомный)
-        self.base_url = f"{self.protocol}://{self.host}:{self.port}/rest"
-        self.session: Optional[requests.Session] = None
-    
+        self.use_ssl = use_ssl
+        self._api = None
+
     def connect(self) -> None:
-        """Подключиться к MikroTik REST API."""
+        """Подключиться к RouterOS API."""
         try:
-            self.session = requests.Session()
-            self.session.auth = (self.username, self.password)
-            # Тестируем подключение
-            response = self.session.get(f"{self.base_url}/system/identity", timeout=10)
-            response.raise_for_status()
+            from librouteros import connect as ros_connect  # local import: optional dependency
+
+            connect_kwargs = {
+                "host": self.host,
+                "port": self.port,
+                "username": self.username,
+                "password": self.password,
+            }
+            if self.use_ssl:
+                # RouterOS API-SSL часто используют самоподписанные/непроверяемые сертификаты.
+                ctx = ssl.create_default_context()
+                ctx.check_hostname = False
+                ctx.verify_mode = ssl.CERT_NONE
+                connect_kwargs["ssl_wrapper"] = ctx.wrap_socket
+
+            self._api = ros_connect(**connect_kwargs)
         except Exception as e:
-            raise MikroTikConnectionError(f"Failed to connect to MikroTik REST API: {str(e)}")
-    
-    def get(self, path: str) -> List[Dict[str, Any]]:
-        """GET запрос к REST API."""
-        if not self.session:
-            raise MikroTikConnectionError("Not connected to MikroTik REST API")
-        
-        try:
-            response = self.session.get(f"{self.base_url}/{path}", timeout=10)
-            response.raise_for_status()
-            return response.json() if response.content else []
-        except Exception as e:
-            raise MikroTikConnectionError(f"REST API GET error: {str(e)}")
-    
-    def post(self, path: str, data: Dict[str, Any]) -> Dict[str, Any]:
-        """POST запрос к REST API."""
-        if not self.session:
-            raise MikroTikConnectionError("Not connected to MikroTik REST API")
-        
-        try:
-            response = self.session.post(
-                f"{self.base_url}/{path}",
-                json=data,
-                timeout=10,
-            )
-            response.raise_for_status()
-            return response.json() if response.content else {}
-        except Exception as e:
-            raise MikroTikConnectionError(f"REST API POST error: {str(e)}")
-    
-    def delete(self, path: str) -> None:
-        """DELETE запрос к REST API."""
-        if not self.session:
-            raise MikroTikConnectionError("Not connected to MikroTik REST API")
-        
-        try:
-            response = self.session.delete(f"{self.base_url}/{path}", timeout=10)
-            response.raise_for_status()
-        except Exception as e:
-            raise MikroTikConnectionError(f"REST API DELETE error: {str(e)}")
-    
+            raise MikroTikConnectionError(f"Failed to connect to MikroTik RouterOS API: {str(e)}")
+
     def disconnect(self) -> None:
-        """Закрыть сессию."""
-        if self.session:
-            self.session.close()
-            self.session = None
+        """Отключиться."""
+        try:
+            if self._api is None:
+                return
+            if hasattr(self._api, "close"):
+                self._api.close()
+        finally:
+            self._api = None
+
+    def path(self, path: str):
+        if self._api is None:
+            raise MikroTikConnectionError("Not connected to MikroTik RouterOS API")
+        p = (path or "").lstrip("/")
+        return self._api.path(p)
+
+    def call(self, cmd: str):
+        """Выполнить RouterOS API команду вида '/system/identity/print'."""
+        if self._api is None:
+            raise MikroTikConnectionError("Not connected to MikroTik RouterOS API")
+        return self._api(cmd)
 
 
 # get_active_mikrotik_config теперь импортируется из mikrotik_config_service
@@ -273,16 +252,16 @@ def test_mikrotik_connection(
             # Выполняем простую команду для проверки
             client.execute_command("/system identity print")
             client.disconnect()
-        elif connection_type == ConnectionType.REST_API:
-            client = MikroTikRESTClient(
+        elif connection_type in {ConnectionType.API, ConnectionType.API_SSL}:
+            client = MikroTikAPIClient(
                 host=host,
                 port=port,
                 username=username,
                 password=password or "",
-                use_https=(port == 443),
+                use_ssl=(connection_type == ConnectionType.API_SSL),
             )
             client.connect()
-            client.get("system/identity")
+            client.call("/system/identity/print")
             client.disconnect()
         else:
             return False, "Unsupported connection type"
@@ -305,6 +284,26 @@ def _get_active_config_dict(db: Session) -> Dict[str, Any]:
     return config_data
 
 
+def _is_routeros_api_connection_type(connection_type_value: Any) -> bool:
+    """
+    Проверка типа подключения для RouterOS API.
+    """
+    ct = str(connection_type_value or "").strip()
+    return ct in {ConnectionType.API.value, ConnectionType.API_SSL.value}
+
+
+def _get_routeros_api_client_from_config(config_data: Dict[str, Any]) -> MikroTikAPIClient:
+    ct = str(config_data.get("connection_type") or "").strip()
+    use_ssl = ct == ConnectionType.API_SSL.value
+    return MikroTikAPIClient(
+        host=config_data["host"],
+        port=int(config_data["port"]),
+        username=config_data["username"],
+        password=config_data.get("password") or "",
+        use_ssl=use_ssl,
+    )
+
+
 def get_mikrotik_users(db: Session) -> List[Dict[str, Any]]:
     """
     Получить список пользователей MikroTik для VPN.
@@ -322,37 +321,40 @@ def get_mikrotik_users_with_info(db: Session) -> tuple[List[Dict[str, Any]], str
     Получить список VPN пользователей и мета-информацию.
 
     Returns:
-      - users: список пользователей (сырой вывод RouterOS REST/CLI, нормализован "name")
+      - users: список пользователей (сырой вывод RouterOS API/CLI, нормализован "name")
       - source: "user_manager" | "ppp_secret"
       - warning: человекочитаемое предупреждение (если есть)
     """
     config_data = _get_active_config_dict(db)
 
     try:
-        if config_data["connection_type"] == ConnectionType.REST_API.value:
-            client = MikroTikRESTClient(
-                host=config_data["host"],
-                port=int(config_data["port"]),
-                username=config_data["username"],
-                password=config_data["password"] or "",
-                use_https=(int(config_data["port"]) == 443),
-            )
+        if _is_routeros_api_connection_type(config_data["connection_type"]):
+            client = _get_routeros_api_client_from_config(config_data)
             client.connect()
             try:
+                def _normalize_user_list(items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+                    for u in items:
+                        if isinstance(u, dict):
+                            if not u.get("name") and u.get("username"):
+                                u["name"] = u.get("username")
+                            b = _normalize_bool(u.get("disabled"))
+                            if b is not None:
+                                u["disabled"] = b
+                    return items
+
                 # 1) User Manager
-                users = client.get("tool/user-manager/user")
-                # нормализуем имя: RouterOS часто использует поле username вместо name
-                for u in users:
-                    if isinstance(u, dict) and not u.get("name") and u.get("username"):
-                        u["name"] = u.get("username")
-                client.disconnect()
-                return users, "user_manager", None
-            except Exception:
+                try:
+                    users = list(client.path("user-manager/user"))
+                except Exception:
+                    # fallback path (иногда встречается как tool/user-manager/user)
+                    users = list(client.path("tool/user-manager/user"))
+                users = _normalize_user_list(users)
+                if users:
+                    return users, "user_manager", None
+
                 # 2) PPP secrets fallback
-                secrets = client.get("ppp/secret")
-                for u in secrets:
-                    if isinstance(u, dict) and not u.get("name") and u.get("username"):
-                        u["name"] = u.get("username")
+                secrets = list(client.path("ppp/secret"))
+                secrets = _normalize_user_list(secrets)
                 warning = (
                     None
                     if secrets
@@ -360,8 +362,9 @@ def get_mikrotik_users_with_info(db: Session) -> tuple[List[Dict[str, Any]], str
                 )
                 if secrets:
                     warning = "User Manager не установлен/недоступен на MikroTik — отображаем PPP secrets."
-            client.disconnect()
-            return secrets, "ppp_secret", warning
+                return secrets, "ppp_secret", warning
+            finally:
+                client.disconnect()
         else:
             # SSH подключение
             connection_type_enum = ConnectionType(config_data["connection_type"])
@@ -462,7 +465,7 @@ def _parse_kv_pairs_from_line(line: str) -> Dict[str, str]:
 
 
 def _normalize_bool(value: Any) -> Optional[bool]:
-    """Нормализовать RouterOS boolean-значения (REST/CLI) в Python bool."""
+    """Нормализовать RouterOS boolean-значения (API/CLI) в Python bool."""
     if value is None:
         return None
     if isinstance(value, bool):
@@ -475,6 +478,37 @@ def _normalize_bool(value: Any) -> Optional[bool]:
     if s in {"false", "no", "disabled", "disable", "0"}:
         return False
     return None
+
+
+def _heuristic_is_active_user_manager_session(session: Dict[str, Any]) -> bool:
+    """
+    Определить, активна ли UM-сессия (для RouterOS API/CLI).
+
+    На некоторых версиях/путях поле `active` может отсутствовать, поэтому используем эвристику:
+    - если нет признаков завершения (`ended`/`end-time`) и статус не содержит "expired" → active
+    """
+    b = _normalize_bool(session.get("active"))
+    if b is not None:
+        return b
+
+    status = str(session.get("status") or "").strip().lower()
+    ended = (
+        session.get("ended")
+        or session.get("end-time")
+        or session.get("end_time")
+        or session.get("stop-time")
+        or session.get("stop_time")
+    )
+    if ended is None or str(ended).strip() == "":
+        if "expired" not in status and "ended" not in status and "terminated" not in status:
+            return True
+    return False
+
+
+def _looks_like_live_um_active_record(record: Dict[str, Any]) -> bool:
+    # Deprecated: do not use heuristics for UM activity.
+    # Active must be determined only by explicit RouterOS "A" flag / active=true.
+    return False
 
 
 def _split_routeros_index_and_flags(line: str) -> tuple[Optional[int], str, str]:
@@ -557,47 +591,32 @@ def create_mikrotik_user(
     config_data = _get_active_config_dict(db)
     
     try:
-        if config_data["connection_type"] == ConnectionType.REST_API.value:
-            client = MikroTikRESTClient(
-                host=config_data["host"],
-                port=int(config_data["port"]),
-                username=config_data["username"],
-                password=config_data["password"] or "",
-                use_https=(int(config_data["port"]) == 443),
-            )
+        if _is_routeros_api_connection_type(config_data["connection_type"]):
+            client = _get_routeros_api_client_from_config(config_data)
             client.connect()
-            # 1) User Manager
             try:
-                data = {
-                    "customer": "admin",
-                    "username": username,
-                    "password": password,
-                }
-                result = client.post("tool/user-manager/user", data)
-                if profile:
-                    # Пытаемся активировать профиль (если endpoint доступен)
-                    try:
-                        client.post(
-                            "tool/user-manager/user/create-and-activate-profile",
-                            {"customer": "admin", "numbers": username, "profile": profile},
-                        )
-                    except Exception:
-                        pass
+                # 1) User Manager
+                try:
+                    um = client.path("user-manager/user")
+                    # В разных RouterOS встречаются поля name/username — используем username
+                    um.add(customer="admin", username=username, password=password)
+                    # TODO: активация профиля в User Manager через API зависит от пакета/версии;
+                    # оставляем best-effort (не критично для работы системы).
+                    return {"name": username, "status": "created"}
+                except Exception:
+                    # 2) PPP secret fallback
+                    secrets = client.path("ppp/secret")
+                    data: Dict[str, Any] = {
+                        "name": username,
+                        "password": password,
+                        "service": "any",
+                    }
+                    if profile:
+                        data["profile"] = profile
+                    secrets.add(**data)
+                    return {"name": username, "status": "created"}
+            finally:
                 client.disconnect()
-                return result
-            except Exception:
-                # 2) PPP secret fallback
-                data = {
-                    "name": username,
-                    "password": password,
-                    # Без знания типа сервиса безопаснее "any"
-                    "service": "any",
-                }
-                if profile:
-                    data["profile"] = profile
-                result = client.post("ppp/secret", data)
-            client.disconnect()
-            return result
         else:
             # SSH подключение
             connection_type_enum = ConnectionType(config_data["connection_type"])
@@ -644,41 +663,36 @@ def delete_mikrotik_user(
     config_data = _get_active_config_dict(db)
     
     try:
-        if config_data["connection_type"] == ConnectionType.REST_API.value:
-            client = MikroTikRESTClient(
-                host=config_data["host"],
-                port=int(config_data["port"]),
-                username=config_data["username"],
-                password=config_data["password"] or "",
-                use_https=(int(config_data["port"]) == 443),
-            )
+        if _is_routeros_api_connection_type(config_data["connection_type"]):
+            client = _get_routeros_api_client_from_config(config_data)
             client.connect()
-            # 1) User Manager
             try:
-                users = client.get("tool/user-manager/user")
-                user_id = None
-                for user in users:
-                    if user.get("username") == username or user.get("name") == username:
-                        user_id = user.get(".id")
-                        break
-                if user_id:
-                    client.delete(f"tool/user-manager/user/{user_id}")
-                    client.disconnect()
-                    return
-            except Exception:
-                pass
+                # 1) User Manager
+                for um_path in ("user-manager/user", "tool/user-manager/user"):
+                    try:
+                        um = client.path(um_path)
+                        users = list(um)
+                        for u in users:
+                            if u.get("username") == username or u.get("name") == username:
+                                rid = u.get(".id") or u.get("id")
+                                if rid:
+                                    um.remove(rid)
+                                    return
+                    except Exception:
+                        pass
 
-            # 2) PPP secret fallback
-            secrets = client.get("ppp/secret")
-            secret_id = None
-            for s in secrets:
-                if s.get("name") == username:
-                    secret_id = s.get(".id")
-                    break
-            if not secret_id:
+                # 2) PPP secret fallback
+                secrets = client.path("ppp/secret")
+                items = list(secrets)
+                for s in items:
+                    if s.get("name") == username:
+                        rid = s.get(".id") or s.get("id")
+                        if rid:
+                            secrets.remove(rid)
+                            return
                 raise MikroTikConnectionError(f"User {username} not found")
-            client.delete(f"ppp/secret/{secret_id}")
-            client.disconnect()
+            finally:
+                client.disconnect()
         else:
             # SSH подключение
             connection_type_enum = ConnectionType(config_data["connection_type"])
@@ -710,29 +724,23 @@ def get_firewall_rules(
     config_data = _get_active_config_dict(db)
     
     try:
-        if config_data["connection_type"] == ConnectionType.REST_API.value:
-            client = MikroTikRESTClient(
-                host=config_data["host"],
-                port=int(config_data["port"]),
-                username=config_data["username"],
-                password=config_data["password"] or "",
-                use_https=(int(config_data["port"]) == 443),
-            )
+        if _is_routeros_api_connection_type(config_data["connection_type"]):
+            client = _get_routeros_api_client_from_config(config_data)
             client.connect()
-            path = "ip/firewall/filter"
-            if chain:
-                # Фильтрация по цепочке через параметры запроса
-                rules = client.get(path)
-                rules = [r for r in rules if r.get("chain") == chain]
-            else:
-                rules = client.get(path)
-            
-            if comment:
-                needle = str(comment).lower()
-                rules = [r for r in rules if needle in str(r.get("comment", "")).lower()]
-            
-            client.disconnect()
-            return rules
+            try:
+                rules = list(client.path("ip/firewall/filter"))
+                for r in rules:
+                    b = _normalize_bool(r.get("disabled"))
+                    if b is not None:
+                        r["disabled"] = b
+                if chain:
+                    rules = [r for r in rules if r.get("chain") == chain]
+                if comment:
+                    needle = str(comment).lower()
+                    rules = [r for r in rules if needle in str(r.get("comment", "")).lower()]
+                return rules
+            finally:
+                client.disconnect()
         else:
             # SSH подключение
             connection_type_enum = ConnectionType(config_data["connection_type"])
@@ -845,17 +853,18 @@ def enable_firewall_rule(
     config_data = _get_active_config_dict(db)
     
     try:
-        if config_data["connection_type"] == ConnectionType.REST_API.value:
-            client = MikroTikRESTClient(
-                host=config_data["host"],
-                port=int(config_data["port"]),
-                username=config_data["username"],
-                password=config_data["password"] or "",
-                use_https=(int(config_data["port"]) == 443),
-            )
+        if _is_routeros_api_connection_type(config_data["connection_type"]):
+            if str(rule_id).isdigit():
+                raise MikroTikConnectionError(
+                    "RouterOS API требует rule .id (например *1). Получен номер правила. Обновите список правил и используйте поле .id."
+                )
+            client = _get_routeros_api_client_from_config(config_data)
             client.connect()
-            client.post(f"ip/firewall/filter/{rule_id}", {"disabled": "false"})
-            client.disconnect()
+            try:
+                fw = client.path("ip/firewall/filter")
+                fw.update(**{".id": rule_id, "disabled": False})
+            finally:
+                client.disconnect()
         else:
             # SSH подключение
             connection_type_enum = ConnectionType(config_data["connection_type"])
@@ -886,17 +895,18 @@ def disable_firewall_rule(
     config_data = _get_active_config_dict(db)
     
     try:
-        if config_data["connection_type"] == ConnectionType.REST_API.value:
-            client = MikroTikRESTClient(
-                host=config_data["host"],
-                port=int(config_data["port"]),
-                username=config_data["username"],
-                password=config_data["password"] or "",
-                use_https=(int(config_data["port"]) == 443),
-            )
+        if _is_routeros_api_connection_type(config_data["connection_type"]):
+            if str(rule_id).isdigit():
+                raise MikroTikConnectionError(
+                    "RouterOS API требует rule .id (например *1). Получен номер правила. Обновите список правил и используйте поле .id."
+                )
+            client = _get_routeros_api_client_from_config(config_data)
             client.connect()
-            client.post(f"ip/firewall/filter/{rule_id}", {"disabled": "true"})
-            client.disconnect()
+            try:
+                fw = client.path("ip/firewall/filter")
+                fw.update(**{".id": rule_id, "disabled": True})
+            finally:
+                client.disconnect()
         else:
             # SSH подключение
             connection_type_enum = ConnectionType(config_data["connection_type"])
@@ -933,28 +943,26 @@ def get_user_manager_users(db: Session) -> Dict[str, Any]:
     config_data = _get_active_config_dict(db)
     
     try:
-        if config_data["connection_type"] == ConnectionType.REST_API.value:
-            client = MikroTikRESTClient(
-                host=config_data["host"],
-                port=int(config_data["port"]),
-                username=config_data["username"],
-                password=config_data["password"] or "",
-                use_https=(int(config_data["port"]) == 443),
-            )
+        if _is_routeros_api_connection_type(config_data["connection_type"]):
+            client = _get_routeros_api_client_from_config(config_data)
             client.connect()
-            # Для REST API пробуем оба пути:
-            # - RouterOS v7 часто: user-manager/user
-            # - иногда встречается: tool/user-manager/user
             try:
-                users = client.get("user-manager/user")
-            except:
-                try:
-                    users = client.get("tool/user-manager/user")
-                except Exception:
-                    # Если User Manager не установлен или недоступен, возвращаем пустой список
-                    users = []
-            client.disconnect()
-            return {"users": users, "total": len(users)}
+                users: List[Dict[str, Any]] = []
+                for um_path in ("user-manager/user", "tool/user-manager/user"):
+                    try:
+                        users = list(client.path(um_path))
+                        break
+                    except Exception:
+                        continue
+                for u in users:
+                    if isinstance(u, dict) and not u.get("name") and u.get("username"):
+                        u["name"] = u.get("username")
+                    b = _normalize_bool(u.get("disabled"))
+                    if b is not None:
+                        u["disabled"] = b
+                return {"users": users, "total": len(users)}
+            finally:
+                client.disconnect()
         else:
             # SSH подключение
             connection_type_enum = ConnectionType(config_data["connection_type"])
@@ -1015,7 +1023,7 @@ def _parse_user_manager_output(output: str) -> List[Dict[str, Any]]:
             current["name"] = current.get("username")
         users.append(current)
 
-    # Нормализуем disabled (на случай REST/других форматов)
+    # Нормализуем disabled (на случай разных форматов)
     for u in users:
         u["disabled"] = _normalize_bool(u.get("disabled")) if _normalize_bool(u.get("disabled")) is not None else bool(u.get("disabled"))
 
@@ -1052,9 +1060,9 @@ def _parse_user_manager_session_output(output: str) -> List[Dict[str, Any]]:
         if line[:1].isdigit():
             # flush previous
             if current:
-                # вычисляем active, если не было выставлено
-                if "active" not in current or current.get("active") is None:
-                    current["active"] = True if "A" in (current_flags or "") else False
+                # Важно: активность определяем ТОЛЬКО по флагу "A" в выводе User Manager sessions.
+                # Никаких эвристик и полей active=yes/true (они встречаются и дают ложные срабатывания).
+                current["active"] = True if "A" in (current_flags or "") else False
                 # нормализуем user поле
                 if "user" not in current:
                     current["user"] = current.get("username") or current.get("name")
@@ -1074,7 +1082,7 @@ def _parse_user_manager_session_output(output: str) -> List[Dict[str, Any]]:
             current = {}
             if number is not None:
                 current["number"] = number
-            # базовая активность по флагу
+            # базовая активность по флагу (может быть перезаписана только явным active=true из полей)
             current["active"] = True if "A" in (current_flags or "") else False
             kv = _parse_kv_pairs_from_line(rest)
             if kv:
@@ -1089,8 +1097,7 @@ def _parse_user_manager_session_output(output: str) -> List[Dict[str, Any]]:
             current.update(kv)
 
     if current:
-        if "active" not in current or current.get("active") is None:
-            current["active"] = True if "A" in (current_flags or "") else False
+        current["active"] = True if "A" in (current_flags or "") else False
         if "user" not in current:
             current["user"] = current.get("username") or current.get("name")
         if "mikrotik_session_id" not in current:
@@ -1102,16 +1109,6 @@ def _parse_user_manager_session_output(output: str) -> List[Dict[str, Any]]:
             )
         sessions.append(current)
 
-    # Доп. эвристика: если RouterOS по какой-то причине не печатает "A",
-    # но сессия выглядит активной (нет ended= и нет expired в status) — считаем active.
-    for s in sessions:
-        if s.get("active") is True:
-            continue
-        status = str(s.get("status") or "").lower()
-        ended = s.get("ended")
-        if (ended is None or str(ended).strip() == "") and ("expired" not in status):
-            s["active"] = True
-
     return sessions
 
 
@@ -1122,66 +1119,39 @@ def get_user_manager_sessions(db: Session) -> List[Dict[str, Any]]:
     """
     config_data = _get_active_config_dict(db)
     try:
-        if config_data["connection_type"] == ConnectionType.REST_API.value:
-            client = MikroTikRESTClient(
-                host=config_data["host"],
-                port=int(config_data["port"]),
-                username=config_data["username"],
-                password=config_data["password"] or "",
-                use_https=(int(config_data["port"]) == 443),
-            )
+        if _is_routeros_api_connection_type(config_data["connection_type"]):
+            client = _get_routeros_api_client_from_config(config_data)
             client.connect()
-            sessions: List[Dict[str, Any]] = []
-            # 1) User Manager sessions (если доступно)
             try:
-                sessions = client.get("user-manager/session")
-            except Exception:
-                try:
-                    sessions = client.get("tool/user-manager/session")
-                except Exception:
-                    sessions = []
+                sessions: List[Dict[str, Any]] = []
 
-            # Нормализуем структуру REST UM sessions под scheduler:
-            # - active (bool)
-            # - user (username)
-            for s in sessions:
-                s["source"] = "user_manager_session"
-                # RouterOS REST часто отдаёт "active": "true"/"false"
-                b = _normalize_bool(s.get("active"))
-                if b is not None:
-                    s["active"] = b
-                if "user" not in s:
-                    s["user"] = s.get("username") or s.get("name")
-                if "mikrotik_session_id" not in s:
-                    s["mikrotik_session_id"] = (
-                        s.get("acct-session-id")
-                        or s.get("acct_session_id")
-                        or s.get(".id")
-                        or s.get("id")
-                    )
+                # User Manager sessions: возвращаем ВСЕ сессии, но active считаем только по явному флагу A / active=true.
+                um_sessions: List[Dict[str, Any]] = []
+                for um_path in ("user-manager/session", "tool/user-manager/session"):
+                    try:
+                        um_sessions = list(client.path(um_path)) or []
+                        break
+                    except Exception:
+                        continue
 
-            # 2) PPP active sessions (часто это “факт подключения”, даже если UM не используется/не отдаёт активные)
-            ppp_active: List[Dict[str, Any]] = []
-            try:
-                ppp_active = client.get("ppp/active") or []
-            except Exception:
-                ppp_active = []
-            for s in ppp_active:
-                s["source"] = "ppp_active"
-                # ppp/active = всегда активные
-                s["active"] = True
-                if "user" not in s:
-                    s["user"] = s.get("name") or s.get("username") or s.get("user")
-                if "mikrotik_session_id" not in s:
-                    s["mikrotik_session_id"] = (
-                        s.get("session-id")
-                        or s.get("session_id")
-                        or s.get(".id")
-                        or s.get("id")
-                    )
+                for s in um_sessions:
+                    s["source"] = "user_manager_session"
+                    b = _normalize_bool(s.get("active"))
+                    s["active"] = b if b is not None else False
+                    if "user" not in s or not s.get("user"):
+                        s["user"] = s.get("user") or s.get("username") or s.get("name")
+                    if "mikrotik_session_id" not in s or not s.get("mikrotik_session_id"):
+                        s["mikrotik_session_id"] = (
+                            s.get("acct-session-id")
+                            or s.get("acct_session_id")
+                            or s.get(".id")
+                            or s.get("id")
+                        )
+                sessions.extend(um_sessions)
 
-            client.disconnect()
-            return sessions + ppp_active
+                return sessions
+            finally:
+                client.disconnect()
         # SSH
         connection_type_enum = ConnectionType(config_data["connection_type"])
         client = MikroTikSSHClient(
@@ -1236,45 +1206,40 @@ def get_user_manager_sessions(db: Session) -> List[Dict[str, Any]]:
 def set_user_manager_user_disabled(db: Session, mikrotik_username: str, disabled: bool) -> None:
     """Включить/выключить пользователя в MikroTik User Manager (disabled=yes/no)."""
     config_data = _get_active_config_dict(db)
-    value = "true" if disabled else "false"
 
     try:
-        if config_data["connection_type"] == ConnectionType.REST_API.value:
-            client = MikroTikRESTClient(
-                host=config_data["host"],
-                port=int(config_data["port"]),
-                username=config_data["username"],
-                password=config_data["password"] or "",
-                use_https=(int(config_data["port"]) == 443),
-            )
+        if _is_routeros_api_connection_type(config_data["connection_type"]):
+            # RouterOS API ожидает boolean-поля как строки "true"/"false"
+            disabled_value = "true" if bool(disabled) else "false"
+            client = _get_routeros_api_client_from_config(config_data)
             client.connect()
-            # 1) User Manager (если доступен)
             try:
-                users = client.get("tool/user-manager/user")
-                user_id = None
-                for u in users:
-                    if u.get("username") == mikrotik_username or u.get("name") == mikrotik_username:
-                        user_id = u.get(".id")
-                        break
-                if user_id:
-                    client.post(f"tool/user-manager/user/{user_id}", {"disabled": value})
-                    client.disconnect()
-                    return
-            except Exception:
-                pass
+                # 1) User Manager
+                for um_path in ("user-manager/user", "tool/user-manager/user"):
+                    try:
+                        um = client.path(um_path)
+                        users = list(um)
+                        for u in users:
+                            if u.get("username") == mikrotik_username or u.get("name") == mikrotik_username:
+                                rid = u.get(".id") or u.get("id")
+                                if rid:
+                                    um.update(**{".id": rid, "disabled": disabled_value})
+                                    return
+                    except Exception:
+                        continue
 
-            # 2) fallback: PPP secret
-            secrets = client.get("ppp/secret")
-            secret_id = None
-            for s in secrets:
-                if s.get("name") == mikrotik_username:
-                    secret_id = s.get(".id")
-                    break
-            if not secret_id:
+                # 2) PPP secret fallback
+                secrets = client.path("ppp/secret")
+                items = list(secrets)
+                for s in items:
+                    if s.get("name") == mikrotik_username:
+                        rid = s.get(".id") or s.get("id")
+                        if rid:
+                            secrets.update(**{".id": rid, "disabled": disabled_value})
+                            return
                 raise MikroTikConnectionError(f"VPN user '{mikrotik_username}' not found (no User Manager, no PPP secret)")
-            client.post(f"ppp/secret/{secret_id}", {"disabled": value})
-            client.disconnect()
-            return
+            finally:
+                client.disconnect()
 
         # SSH
         connection_type_enum = ConnectionType(config_data["connection_type"])
@@ -1320,51 +1285,80 @@ def terminate_active_sessions_for_username(db: Session, mikrotik_username: str) 
 
     config_data = _get_active_config_dict(db)
     try:
-        if config_data["connection_type"] == ConnectionType.REST_API.value:
-            client = MikroTikRESTClient(
-                host=config_data["host"],
-                port=int(config_data["port"]),
-                username=config_data["username"],
-                password=config_data["password"] or "",
-                use_https=(int(config_data["port"]) == 443),
-            )
+        if _is_routeros_api_connection_type(config_data["connection_type"]):
+            client = _get_routeros_api_client_from_config(config_data)
             client.connect()
             try:
-                # 1) PPP active
-                try:
-                    active = client.get("ppp/active") or []
-                    for a in active:
-                        name = a.get("name") or a.get("user") or a.get("username")
-                        if name != mikrotik_username:
-                            continue
-                        rid = a.get(".id") or a.get("id")
-                        if rid:
-                            try:
-                                client.delete(f"ppp/active/{rid}")
-                            except Exception:
-                                pass
-                except Exception:
-                    pass
+                removed = 0
+                errors: list[str] = []
 
-                # 2) User Manager session (если доступно)
-                for path in ("user-manager/session", "tool/user-manager/session"):
-                    try:
-                        um = client.get(path) or []
-                    except Exception:
-                        continue
-                    for s in um:
-                        u = s.get("user") or s.get("username") or s.get("name")
+                # 0) PPP active: это фактическое VPN-подключение. Для "disconnect" важно рвать именно его.
+                # При этом "факт активности" мы продолжаем определять через User Manager.
+                ppp_ids: list[str] = []
+                try:
+                    ppp = client.path("ppp/active")
+                    items = list(ppp) or []
+                    for s in items:
+                        # В разных профилях поле может называться name/user
+                        u = s.get("name") or s.get("user") or s.get("username")
                         if u != mikrotik_username:
-                            continue
-                        b = _normalize_bool(s.get("active"))
-                        if b is False:
                             continue
                         rid = s.get(".id") or s.get("id")
                         if rid:
+                            ppp_ids.append(str(rid))
+                    for rid in ppp_ids:
+                        try:
+                            ppp.remove(rid)
+                            removed += 1
+                        except Exception as e:  # noqa: BLE001
+                            errors.append(f"ppp/active remove {rid}: {e}")
+                except Exception as e:  # noqa: BLE001
+                    # ppp/active может быть недоступен по правам, но UM-часть всё равно попробуем
+                    errors.append(f"ppp/active list/remove failed: {e}")
+
+                # User Manager session: удаляем только active=true (флаг A)
+                um_ids: list[str] = []
+                for um_path in ("user-manager/session", "tool/user-manager/session"):
+                    try:
+                        um = client.path(um_path)
+                        try:
+                            from librouteros.query import Key  # type: ignore[import-not-found]
+
+                            active_key = Key("active")
+                            items = list(um.select().where(active_key == True))  # noqa: E712
+                        except Exception:
+                            items = list(um) or []
+
+                        for s in items:
+                            u = s.get("user") or s.get("username") or s.get("name")
+                            if u != mikrotik_username:
+                                continue
+                            if _normalize_bool(s.get("active")) is not True:
+                                continue
+                            rid = s.get(".id") or s.get("id")
+                            if rid:
+                                um_ids.append(str(rid))
+
+                        for rid in um_ids:
                             try:
-                                client.delete(f"{path}/{rid}")
-                            except Exception:
-                                pass
+                                um.remove(rid)
+                                removed += 1
+                            except Exception as e:  # noqa: BLE001
+                                errors.append(f"{um_path} remove {rid}: {e}")
+                        break
+                    except Exception as e:  # noqa: BLE001
+                        errors.append(f"{um_path} list/remove failed: {e}")
+                        continue
+
+                # Если нашли сессии, но не смогли удалить ни одну — вернем ошибку,
+                # чтобы в UI было понятно, что не хватает прав/сервисов.
+                if (ppp_ids or um_ids) and removed == 0 and errors:
+                    raise MikroTikConnectionError(
+                        "Failed to terminate active sessions via RouterOS API. "
+                        "Most common reasons: API service disabled, wrong port (8728/8729), "
+                        "or insufficient permissions (need write policy for ppp and User Manager paths). "
+                        f"Details: {'; '.join(errors[:5])}"
+                    )
             finally:
                 client.disconnect()
             return
@@ -1396,9 +1390,11 @@ def terminate_active_sessions_for_username(db: Session, mikrotik_username: str) 
                 client.execute_command(cmd_um2)
         finally:
             client.disconnect()
-    except Exception:
-        # Не валим основной флоу — это best-effort
-        return
+    except MikroTikConnectionError:
+        raise
+    except Exception as e:
+        # best-effort для основных сценариев, но ошибку можно показать через /api/mikrotik/users/{username}/disconnect
+        raise MikroTikConnectionError(f"Failed to terminate active sessions: {e}")
 
 
 def enable_user_manager_user(db: Session, mikrotik_username: str) -> None:
