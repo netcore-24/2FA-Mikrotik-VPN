@@ -524,6 +524,8 @@ final_summary() {
   local ip port
   ip="$(detect_ip)"
   port="8000"
+  local cred_file
+  cred_file="${PROJECT_DIR}/.admin_credentials.txt"
   echo ""
   log_info "=========================================="
   log_info "  Установка завершена"
@@ -532,12 +534,21 @@ final_summary() {
   log_success "Проект: ${PROJECT_DIR}"
   log_success "Пользователь: ${SYSTEM_USER}"
   echo ""
-  log_info "🌐 Доступ к веб-интерфейсу:"
+  log_info "🌐 Доступ к сервису:"
+  echo "   - IP:   ${ip}"
+  echo "   - Port: ${port}"
   echo "   - Web:  http://${ip}:${port}"
   echo "   - Docs: http://${ip}:${port}/docs"
   echo ""
   log_info "🔐 Учетные данные администратора:"
   echo -e "   ${ADMIN_CREDENTIALS}" | sed 's/^/   /' | sed 's/\\n/\n   /g'
+  if [[ -f "${cred_file}" ]]; then
+    echo ""
+    log_info "📄 Файл с учетными данными (если был сгенерирован пароль):"
+    echo "   - Path: ${cred_file}"
+    echo "   - Show: sudo cat ${cred_file}"
+    echo "   - Remove after saving: sudo rm -f ${cred_file}"
+  fi
   echo ""
   log_info "Управление:"
   if can_use_systemd; then
