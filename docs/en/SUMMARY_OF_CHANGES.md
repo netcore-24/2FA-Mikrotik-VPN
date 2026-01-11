@@ -5,7 +5,8 @@ This is a real-world working scenario — from preparing MikroTik to the user co
 ## 1) Prepare MikroTik
 
 1. The administrator **creates a VPN user on MikroTik** (User Manager or a PPP secret — depends on router configuration).
-2. If needed, the administrator creates/configures a **firewall rule** with a comment containing `2FA` (if “extra protection” is planned).
+2. If needed, the administrator creates/configures a **firewall rule** with a comment containing `2FA` (if “extra protection” is planned).  
+   **Important:** firewall rule discovery relies on `comment` containing `2FA` — rules without `2FA` will not be found.
 
 Important: the system does **not have to** create users on MikroTik (it can manage existing ones). In the current project configuration, management and synchronization are supported, but the baseline logic always relies on accounts on the router.
 

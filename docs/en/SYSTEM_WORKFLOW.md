@@ -14,6 +14,7 @@ The system implements **2FA for VPN sessions on MikroTik** by controlling existi
   It **does not** create MikroTik users by itself in the intended setup.
 - **VPN user passwords are not stored** in the system. The admin distributes them via a secure channel.
 - Each system user can have **up to 2 linked MikroTik accounts**.
+- Firewall rules used for “extra protection” are discovered by checking whether the rule `comment` contains **`2FA`**. Rules without `2FA` in their comment will not be listed/selected.
 
 ## End-to-end flow
 

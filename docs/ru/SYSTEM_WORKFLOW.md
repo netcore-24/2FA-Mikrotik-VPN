@@ -408,6 +408,12 @@ Scheduler → Check Session Expiry → Send Reminder
 #### 5. Управление Firewall правилами
 
 **Поиск правила по комментарию:**
+
+⚠️ **Важно:** в проекте “доп. защита” (firewall) использует фильтрацию правил по **наличию `2FA` в `comment`**.  
+Если в комментарии правила нет строки `2FA`, система не сможет его найти/показать для выбора.
+
+Пример комментария: `2FA user vpn_user_ivan`
+
 ```
 /ip firewall filter print detail where comment="vpn_user_maria_1"
 ```
