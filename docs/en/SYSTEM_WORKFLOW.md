@@ -50,7 +50,7 @@ The system implements **2FA for VPN sessions on MikroTik** by controlling existi
 
 - Telegram message flow: `telegram_messages_flow.md`
 - System flow diagram: `system_flow_diagram.md`
-- Install: `../en/INSTALL.md`
+- Install: `INSTALL.md`
 
 ## Full Russian workflow (source of truth)
 

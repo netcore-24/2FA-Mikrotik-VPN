@@ -169,11 +169,9 @@ sudo rm -f /opt/mikrotik-2fa-vpn/.admin_credentials.txt
 
 ### Новый администратор?
 
-1. **Прочитайте:** [SYSTEM_WORKFLOW.md](SYSTEM_WORKFLOW.md) - понять как работает система
-2. **Визуализация:** [docs/system_flow_diagram.md](docs/system_flow_diagram.md) - схемы процессов
+1. **Прочитайте:** [RU](docs/ru/SYSTEM_WORKFLOW.md) | [EN](docs/en/SYSTEM_WORKFLOW.md) — понять как работает система
+2. **Визуализация:** [RU](docs/ru/system_flow_diagram.md) | [EN](docs/en/system_flow_diagram.md) — схемы процессов
  
-RU/EN: [Workflow RU](docs/ru/SYSTEM_WORKFLOW.md) · [Workflow EN](docs/en/SYSTEM_WORKFLOW.md) · [Diagrams RU](docs/ru/system_flow_diagram.md) · [Diagrams EN](docs/en/system_flow_diagram.md)
-
 ### Быстрый старт
 
 См. [RU](docs/ru/QUICK_START.md) | [EN](docs/en/QUICK_START.md)
